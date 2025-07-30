@@ -8,6 +8,7 @@ import NotFound from "@/pages/not-found";
 import Home from "@/pages/home";
 import Checkout from "@/pages/checkout";
 import OrderHistory from "@/pages/order-history";
+import Summary from "@/pages/summary";
 
 function Router() {
   return (
@@ -15,6 +16,7 @@ function Router() {
       <Route path="/" component={Home} />
       <Route path="/checkout" component={Checkout} />
       <Route path="/orders" component={OrderHistory} />
+      <Route path="/summary" component={Summary} />
       <Route component={NotFound} />
     </Switch>
   );

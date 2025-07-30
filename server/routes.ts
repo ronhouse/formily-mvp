@@ -170,30 +170,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Mock STL generation endpoint
   app.post("/api/generate-stl", async (req, res) => {
     try {
-      const { orderId } = req.body;
+      const { orderId, userId } = req.body;
       
       if (!orderId) {
         return res.status(400).json({ message: "Order ID is required" });
       }
       
-      // Simulate STL generation process
-      setTimeout(async () => {
-        try {
-          const stlFileUrl = `https://example.com/stl/${orderId}.stl`;
-          await storage.updateOrder(orderId, {
-            status: "completed",
-            stlFileUrl: stlFileUrl,
-          });
-        } catch (error) {
-          console.error("Error updating order with STL:", error);
-        }
-      }, 2000);
+      // Generate mock STL URL with user ID and timestamp
+      const timestamp = Date.now();
+      const stlFileUrl = `https://formily.fakecdn.io/generated/${userId}-${timestamp}.stl`;
       
+      // Simulate STL generation process (instant completion for demo)
       await storage.updateOrder(orderId, {
-        status: "processing",
+        status: "completed",
+        stlFileUrl: stlFileUrl,
       });
       
-      res.json({ message: "STL generation started" });
+      res.json({ 
+        message: "STL generation completed",
+        stlFileUrl: stlFileUrl,
+        orderId: orderId
+      });
     } catch (error: any) {
       res.status(500).json({ message: "Error generating STL: " + error.message });
     }

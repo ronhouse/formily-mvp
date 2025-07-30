@@ -130,8 +130,8 @@ export default function Home() {
         totalAmount: total,
       });
 
-      // Redirect to checkout with order ID
-      setLocation(`/checkout?orderId=${order.id}`);
+      // Redirect to summary with order ID for STL generation
+      setLocation(`/summary?orderId=${order.id}`);
     } catch (error: any) {
       toast({
         title: "Error creating order",
