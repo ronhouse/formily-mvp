@@ -146,14 +146,22 @@ export default function Home() {
       case 1:
         return (
           <div>
-            <LandingHero onGetStarted={() => {}} />
+            <LandingHero onGetStarted={() => {
+              // Scroll to the file upload section
+              const fileUploadSection = document.querySelector('.file-upload-section');
+              if (fileUploadSection) {
+                fileUploadSection.scrollIntoView({ behavior: 'smooth' });
+              }
+            }} />
 
-            <FileUpload
-              onFileUploaded={(fileData) => {
-                setOrderData({ ...orderData, photoUrl: fileData.url });
-              }}
-              className="mb-8"
-            />
+            <div className="file-upload-section">
+              <FileUpload
+                onFileUploaded={(fileData) => {
+                  setOrderData({ ...orderData, photoUrl: fileData.url });
+                }}
+                className="mb-8"
+              />
+            </div>
 
             <Card className="bg-blue-50 mb-8">
               <CardContent className="p-6">

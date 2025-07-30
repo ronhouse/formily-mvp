@@ -92,6 +92,12 @@ export function FileUpload({ onFileUploaded, className }: FileUploadProps) {
     const files = Array.from(e.target.files || []);
     if (files.length > 0) {
       handleFileSelect(files[0]);
+    } else {
+      toast({
+        title: "No file selected",
+        description: "Please select an image file to upload",
+        variant: "destructive",
+      });
     }
   };
 

@@ -27,10 +27,7 @@ export default function Summary() {
       return await response.json();
     },
     enabled: !!orderId,
-    refetchInterval: (data) => {
-      // Keep polling if STL is not ready yet
-      return data?.status !== 'completed' ? 2000 : false;
-    },
+    refetchInterval: 2000, // Poll every 2 seconds until component unmounts or query succeeds
   });
 
   // Trigger STL generation when component mounts
