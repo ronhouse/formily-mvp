@@ -14,8 +14,8 @@ export const orders = pgTable("orders", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").references(() => users.id).notNull(),
   status: text("status").notNull().default("pending"), // pending, processing, completed, failed
-  photoUrl: text("photo_url").notNull(),
-  style: text("style").notNull(), // keychain, tag, plaque
+  photoUrl: text("image_url").notNull(), // Changed from photo_url to image_url
+  style: text("model_type").notNull(), // Changed from style to model_type (keychain, tag, plaque)
   engravingText: text("engraving_text"),
   fontStyle: text("font_style").default("arial"),
   color: text("color").default("black"),

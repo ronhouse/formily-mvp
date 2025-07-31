@@ -101,14 +101,99 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Orders
+  // Orders - Using Supabase directly
   app.post("/api/orders", async (req, res) => {
     try {
+      console.log('📝 Creating new order with data:', JSON.stringify(req.body, null, 2));
+      
+      // Parse and validate the order data
       const orderData = insertOrderSchema.parse(req.body);
-      const order = await storage.createOrder(orderData);
-      res.json(order);
+      console.log('✅ Order data validation passed:', orderData);
+      
+      // Import Supabase client
+      const { createClient } = await import('@supabase/supabase-js');
+      const supabaseUrl = process.env.VITE_SUPABASE_URL;
+      const supabaseKey = process.env.VITE_SUPABASE_ANON_KEY;
+      
+      if (!supabaseUrl || !supabaseKey) {
+        console.error('❌ Missing Supabase credentials');
+        return res.status(500).json({ message: "Supabase configuration missing" });
+      }
+      
+      const supabase = createClient(supabaseUrl, supabaseKey);
+      console.log('🔗 Supabase client initialized');
+      
+      // Insert order into Supabase orders table
+      const { data: order, error } = await supabase
+        .from('orders')
+        .insert({
+          user_id: orderData.userId,
+          status: 'pending',
+          image_url: orderData.photoUrl, // Map photoUrl to image_url
+          model_type: orderData.style,   // Map style to model_type
+          engraving_text: orderData.engravingText || null,
+          font_style: orderData.fontStyle || 'arial',
+          color: orderData.color || 'black',
+          quality: orderData.quality || 'standard',
+          total_amount: orderData.totalAmount,
+          stripe_payment_intent_id: orderData.stripePaymentIntentId || null,
+          stl_file_url: orderData.stlFileUrl || null,
+          specifications: orderData.specifications || null,
+        })
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('❌ Supabase insert error:', error);
+        return res.status(500).json({ 
+          message: "Failed to create order in Supabase", 
+          error: error.message 
+        });
+      }
+      
+      console.log('✅ Order successfully created in Supabase:', order.id);
+      console.log('📊 Order details:', {
+        id: order.id,
+        user_id: order.user_id,
+        image_url: order.image_url,
+        model_type: order.model_type,
+        engraving_text: order.engraving_text,
+        total_amount: order.total_amount
+      });
+      
+      // Convert snake_case back to camelCase for frontend compatibility
+      const formattedOrder = {
+        id: order.id,
+        userId: order.user_id,
+        status: order.status,
+        photoUrl: order.image_url,
+        style: order.model_type,
+        engravingText: order.engraving_text,
+        fontStyle: order.font_style,
+        color: order.color,
+        quality: order.quality,
+        totalAmount: order.total_amount,
+        stripePaymentIntentId: order.stripe_payment_intent_id,
+        stlFileUrl: order.stl_file_url,
+        specifications: order.specifications,
+        createdAt: order.created_at,
+        updatedAt: order.updated_at,
+      };
+      
+      res.json(formattedOrder);
     } catch (error: any) {
-      res.status(400).json({ message: "Error creating order: " + error.message });
+      console.error('💥 Order creation failed:', error);
+      if (error.name === 'ZodError') {
+        console.error('📋 Validation errors:', error.errors);
+        res.status(400).json({ 
+          message: "Validation failed", 
+          errors: error.errors 
+        });
+      } else {
+        res.status(500).json({ 
+          message: "Error creating order: " + error.message 
+        });
+      }
     }
   });
 
