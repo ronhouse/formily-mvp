@@ -136,3 +136,8 @@ Preferred communication style: Simple, everyday language.
 - ✅ Enhanced error handling and console logging for order API
 
 The application now stores orders directly in Supabase with proper field mapping and comprehensive logging. Successfully switched from PostgreSQL to Supabase for production data storage with complete field validation and error handling.
+
+**Supabase Schema Update Required:**
+- Missing columns: font_style, color, quality, stripe_payment_intent_id, stl_file_url, specifications
+- SQL script provided for schema updates with proper data types and indexes
+- All field validation working: image_url (string), model_type, engraving_text

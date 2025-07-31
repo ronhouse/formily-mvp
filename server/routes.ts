@@ -154,14 +154,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const supabase = createClient(supabaseUrl, supabaseKey);
       console.log('🔗 Supabase client initialized successfully');
       
-      // Prepare Supabase insert payload with only required fields that exist in Supabase table
+      // Prepare complete Supabase insert payload with all application fields
       const supabasePayload = {
         user_id: orderData.userId,
         status: 'pending',
         image_url: imageUrl,
         model_type: orderData.style,
         engraving_text: orderData.engravingText || null,
-        total_amount: orderData.totalAmount
+        font_style: orderData.fontStyle || 'arial',
+        color: orderData.color || 'black',
+        quality: orderData.quality || 'standard',
+        total_amount: orderData.totalAmount,
+        stripe_payment_intent_id: orderData.stripePaymentIntentId || null,
+        stl_file_url: orderData.stlFileUrl || null,
+        specifications: orderData.specifications || null
       };
       
       console.log('📋 SUPABASE INSERT PAYLOAD:');
