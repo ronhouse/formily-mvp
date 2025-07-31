@@ -126,18 +126,53 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log('✅ Image URL validation passed');
       
-      // Create order using PostgreSQL storage
-      const order = await storage.createOrder(orderData);
+      // Prepare full payload for database insert
+      const fullPayload = {
+        userId: orderData.userId,
+        photoUrl: imageUrl, // This will map to image_url in DB
+        style: orderData.style, // This will map to model_type in DB  
+        engravingText: orderData.engravingText || null,
+        fontStyle: orderData.fontStyle || 'arial',
+        color: orderData.color || 'black',
+        quality: orderData.quality || 'standard',
+        totalAmount: orderData.totalAmount,
+        stripePaymentIntentId: orderData.stripePaymentIntentId || null,
+        stlFileUrl: orderData.stlFileUrl || null,
+        specifications: orderData.specifications || null
+      };
       
-      console.log('✅ Order successfully created in PostgreSQL:', order.id);
-      console.log('📊 Order details:', {
-        id: order.id,
-        userId: order.userId,
-        image_url: order.photoUrl, // This maps to image_url in DB
-        model_type: order.style,   // This maps to model_type in DB
-        engraving_text: order.engravingText,
-        total_amount: order.totalAmount
-      });
+      console.log('📋 FULL DATABASE INSERT PAYLOAD:');
+      console.log('=====================================');
+      console.log(JSON.stringify(fullPayload, null, 2));
+      console.log('=====================================');
+      console.log('Field mappings for database:');
+      console.log('- photoUrl →', fullPayload.photoUrl, '(stored as image_url)');
+      console.log('- style →', fullPayload.style, '(stored as model_type)');
+      console.log('- engravingText →', fullPayload.engravingText, '(stored as engraving_text)');
+      console.log('=====================================');
+      
+      // Create order using PostgreSQL storage with enhanced error handling
+      let order;
+      try {
+        order = await storage.createOrder(fullPayload);
+        console.log('✅ Order successfully inserted into database with ID:', order.id);
+      } catch (dbError: any) {
+        console.error('❌ DATABASE INSERT FAILED:');
+        console.error('Error type:', dbError.constructor.name);
+        console.error('Error message:', dbError.message);
+        console.error('Error stack:', dbError.stack);
+        console.error('Payload that failed:', JSON.stringify(fullPayload, null, 2));
+        throw new Error(`Database insert failed: ${dbError.message}`);
+      }
+      
+      console.log('📊 Successfully created order details:');
+      console.log('- Order ID:', order.id);
+      console.log('- User ID:', order.userId);
+      console.log('- Image URL (from DB):', order.photoUrl);
+      console.log('- Style/Model Type (from DB):', order.style);
+      console.log('- Engraving Text (from DB):', order.engravingText);
+      console.log('- Total Amount (from DB):', order.totalAmount);
+      console.log('- Created At:', order.createdAt);
       
       res.json(order);
     } catch (error: any) {

@@ -73,15 +73,37 @@ export class PostgresStorage implements IStorage {
 
   async createOrder(insertOrder: InsertOrder): Promise<Order> {
     try {
-      console.log('🗄️  Inserting order into PostgreSQL with data:', insertOrder);
-      const result = await this.db.insert(orders).values({
+      console.log('🗄️  PostgreSQL STORAGE: Inserting order with data:');
+      console.log('=====================================');
+      console.log('Raw insert data:', JSON.stringify(insertOrder, null, 2));
+      
+      const insertData = {
         ...insertOrder,
         status: 'pending'
-      }).returning();
-      console.log('✅ PostgreSQL insert successful:', result[0].id);
+      };
+      
+      console.log('Final insert payload for DB:', JSON.stringify(insertData, null, 2));
+      console.log('=====================================');
+      
+      const result = await this.db.insert(orders).values(insertData).returning();
+      
+      if (!result || result.length === 0) {
+        throw new Error('No result returned from database insert');
+      }
+      
+      console.log('✅ PostgreSQL insert SUCCESSFUL:');
+      console.log('- Inserted order ID:', result[0].id);
+      console.log('- Database returned fields:', Object.keys(result[0]));
+      console.log('- image_url field value:', result[0].photoUrl);
+      console.log('- model_type field value:', result[0].style);
+      
       return result[0];
-    } catch (error) {
-      console.error('❌ PostgreSQL insert error:', error);
+    } catch (error: any) {
+      console.error('❌ PostgreSQL STORAGE ERROR:');
+      console.error('Error type:', error.constructor?.name || 'Unknown');
+      console.error('Error message:', error.message);
+      console.error('Error code:', error.code);
+      console.error('Insert data that failed:', JSON.stringify(insertOrder, null, 2));
       throw error;
     }
   }
