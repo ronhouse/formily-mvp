@@ -67,6 +67,7 @@ export default function Home() {
       const response = await apiRequest('POST', '/api/orders', {
         ...data,
         userId: user?.id,
+        totalAmount: data.totalAmount.toString(), // Convert number to string for decimal field
         specifications: {
           dimensions: STYLE_OPTIONS.find(s => s.id === data.style)?.dimensions,
           material: STYLE_OPTIONS.find(s => s.id === data.style)?.material,
