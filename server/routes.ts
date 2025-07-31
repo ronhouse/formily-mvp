@@ -101,7 +101,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Orders - Using PostgreSQL with enhanced logging
+  // Orders - Using Supabase directly with comprehensive logging
   app.post("/api/orders", async (req, res) => {
     try {
       console.log('📝 Creating new order with data:', JSON.stringify(req.body, null, 2));
@@ -126,55 +126,109 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       console.log('✅ Image URL validation passed');
       
-      // Prepare full payload for database insert
-      const fullPayload = {
-        userId: orderData.userId,
-        photoUrl: imageUrl, // This will map to image_url in DB
-        style: orderData.style, // This will map to model_type in DB  
-        engravingText: orderData.engravingText || null,
-        fontStyle: orderData.fontStyle || 'arial',
-        color: orderData.color || 'black',
-        quality: orderData.quality || 'standard',
-        totalAmount: orderData.totalAmount,
-        stripePaymentIntentId: orderData.stripePaymentIntentId || null,
-        stlFileUrl: orderData.stlFileUrl || null,
-        specifications: orderData.specifications || null
-      };
+      // Import and configure Supabase client
+      const { createClient } = await import('@supabase/supabase-js');
       
-      console.log('📋 FULL DATABASE INSERT PAYLOAD:');
-      console.log('=====================================');
-      console.log(JSON.stringify(fullPayload, null, 2));
-      console.log('=====================================');
-      console.log('Field mappings for database:');
-      console.log('- photoUrl →', fullPayload.photoUrl, '(stored as image_url)');
-      console.log('- style →', fullPayload.style, '(stored as model_type)');
-      console.log('- engravingText →', fullPayload.engravingText, '(stored as engraving_text)');
-      console.log('=====================================');
+      // Get environment variables (the environment variables are swapped in secrets)
+      const supabaseUrl = process.env.VITE_SUPABASE_ANON_KEY; // This actually contains the URL
+      const supabaseKey = process.env.VITE_SUPABASE_URL; // This actually contains the anon key
       
-      // Create order using PostgreSQL storage with enhanced error handling
-      let order;
-      try {
-        order = await storage.createOrder(fullPayload);
-        console.log('✅ Order successfully inserted into database with ID:', order.id);
-      } catch (dbError: any) {
-        console.error('❌ DATABASE INSERT FAILED:');
-        console.error('Error type:', dbError.constructor.name);
-        console.error('Error message:', dbError.message);
-        console.error('Error stack:', dbError.stack);
-        console.error('Payload that failed:', JSON.stringify(fullPayload, null, 2));
-        throw new Error(`Database insert failed: ${dbError.message}`);
+      console.log('🔧 Supabase Environment Check:');
+      console.log('- Raw VITE_SUPABASE_URL env var:', process.env.VITE_SUPABASE_URL ? `${process.env.VITE_SUPABASE_URL.substring(0, 30)}...` : 'MISSING');
+      console.log('- Raw VITE_SUPABASE_ANON_KEY env var:', process.env.VITE_SUPABASE_ANON_KEY ? `${process.env.VITE_SUPABASE_ANON_KEY.substring(0, 30)}...` : 'MISSING');
+      console.log('- Assigned supabaseUrl (from ANON_KEY):', supabaseUrl ? `${supabaseUrl.substring(0, 30)}...` : 'MISSING');
+      console.log('- Assigned supabaseKey (from URL):', supabaseKey ? `${supabaseKey.substring(0, 30)}...` : 'MISSING');
+      console.log('- URL validation - starts with https?', supabaseUrl ? supabaseUrl.startsWith('https://') : 'N/A');
+      
+      if (!supabaseUrl || !supabaseKey) {
+        console.error('❌ Missing Supabase credentials');
+        return res.status(500).json({ message: "Supabase configuration missing" });
       }
       
-      console.log('📊 Successfully created order details:');
-      console.log('- Order ID:', order.id);
-      console.log('- User ID:', order.userId);
-      console.log('- Image URL (from DB):', order.photoUrl);
-      console.log('- Style/Model Type (from DB):', order.style);
-      console.log('- Engraving Text (from DB):', order.engravingText);
-      console.log('- Total Amount (from DB):', order.totalAmount);
-      console.log('- Created At:', order.createdAt);
+      // Validate Supabase URL format
+      if (!supabaseUrl.startsWith('https://')) {
+        console.error('❌ Invalid Supabase URL format:', supabaseUrl);
+        return res.status(500).json({ message: "Invalid Supabase URL - must start with https://" });
+      }
       
-      res.json(order);
+      const supabase = createClient(supabaseUrl, supabaseKey);
+      console.log('🔗 Supabase client initialized successfully');
+      
+      // Prepare Supabase insert payload with only required fields that exist in Supabase table
+      const supabasePayload = {
+        user_id: orderData.userId,
+        status: 'pending',
+        image_url: imageUrl,
+        model_type: orderData.style,
+        engraving_text: orderData.engravingText || null,
+        total_amount: orderData.totalAmount
+      };
+      
+      console.log('📋 SUPABASE INSERT PAYLOAD:');
+      console.log('=====================================');
+      console.log(JSON.stringify(supabasePayload, null, 2));
+      console.log('=====================================');
+      console.log('Key field validation:');
+      console.log('- image_url:', supabasePayload.image_url, '(type:', typeof supabasePayload.image_url, ')');
+      console.log('- model_type:', supabasePayload.model_type);
+      console.log('- engraving_text:', supabasePayload.engraving_text);
+      console.log('=====================================');
+      
+      // Insert into Supabase orders table
+      const { data: order, error } = await supabase
+        .from('orders')
+        .insert(supabasePayload)
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('❌ SUPABASE INSERT ERROR:');
+        console.error('Error code:', error.code);
+        console.error('Error message:', error.message);
+        console.error('Error details:', error.details);
+        console.error('Error hint:', error.hint);
+        console.error('Payload that failed:', JSON.stringify(supabasePayload, null, 2));
+        return res.status(500).json({ 
+          message: "Failed to create order in Supabase", 
+          error: error.message,
+          details: error.details
+        });
+      }
+      
+      console.log('✅ SUPABASE INSERT SUCCESSFUL:');
+      console.log('- Order ID:', order.id);
+      console.log('- All returned fields:', Object.keys(order));
+      console.log('- image_url stored:', order.image_url);
+      console.log('- model_type stored:', order.model_type);
+      console.log('- engraving_text stored:', order.engraving_text);
+      
+      // Convert snake_case back to camelCase for frontend compatibility
+      const formattedOrder = {
+        id: order.id,
+        userId: order.user_id,
+        status: order.status,
+        photoUrl: order.image_url,
+        style: order.model_type,
+        engravingText: order.engraving_text,
+        fontStyle: order.font_style,
+        color: order.color,
+        quality: order.quality,
+        totalAmount: order.total_amount,
+        stripePaymentIntentId: order.stripe_payment_intent_id,
+        stlFileUrl: order.stl_file_url,
+        specifications: order.specifications,
+        createdAt: order.created_at,
+        updatedAt: order.updated_at,
+      };
+      
+      console.log('📊 Formatted response for frontend:', {
+        id: formattedOrder.id,
+        image_url: formattedOrder.photoUrl,
+        model_type: formattedOrder.style,
+        engraving_text: formattedOrder.engravingText
+      });
+      
+      res.json(formattedOrder);
     } catch (error: any) {
       console.error('💥 Order creation failed:', error);
       if (error.name === 'ZodError') {
