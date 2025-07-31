@@ -1,10 +1,18 @@
 import { createClient } from '@supabase/supabase-js';
 
-// Supabase configuration with placeholder values
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://placeholder-project.supabase.co';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'placeholder-anon-key';
+// Supabase configuration using environment variables
+// Note: The environment variables appear to be swapped in the secrets
+const supabaseUrl = import.meta.env.VITE_SUPABASE_ANON_KEY; // Actually contains the URL
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_URL; // Actually contains the anon key
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.warn('Supabase environment variables not found. Using fallback authentication.');
+}
+
+export const supabase = createClient(
+  supabaseUrl || 'https://placeholder-project.supabase.co',
+  supabaseAnonKey || 'placeholder-anon-key'
+);
 
 // Anonymous authentication helper
 export async function signInAnonymously() {

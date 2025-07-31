@@ -21,7 +21,7 @@
 
 ## 📌 Next Priorities
 
-- [ ] Finalize `/docs/` logs (progress-log, wiring-status, prompts-used)
-- [ ] Build mock STL generator + summary screen
+- [ ] Finalize `/docs/` logs (in progress)
+- [ ] Fix type error (`totalAmount`) before payment logic
 - [ ] Integrate Stripe test checkout
 - [ ] Connect print partner webhook (Craftcloud, Treatstock)
