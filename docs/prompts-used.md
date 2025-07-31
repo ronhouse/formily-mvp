@@ -30,3 +30,17 @@ Result: Working upload flow and redirect, server responds with image URL
 > - STL download link
 
 Result: Summary screen visible, mock STL shown, flow complete up to payment
+
+## 2025-07-31 – Fix Supabase Insert Path
+
+> The checkout process is hitting a 500 error and orders aren't appearing in Supabase. Can you verify where the app is writing orders, confirm the database connection is Supabase (not Replit), and insert valid payloads?
+
+Result: Agent confirmed connection was hitting Replit PostgreSQL. Fixed environment keys, verified full Supabase connectivity, and added insert logging.
+
+---
+
+## 2025-07-31 – Orders Table Schema Rebuild
+
+> The Supabase orders table is missing fields like color, font, and stl_file_url. Can you recreate the table to match the app’s full schema?
+
+Result: Agent generated SQL to drop and rebuild the table. Schema now matches app and receives real data.
