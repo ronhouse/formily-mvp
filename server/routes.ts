@@ -254,7 +254,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get("/api/orders/user/:userId", async (req, res) => {
     try {
       const { userId } = req.params;
-      const orders = await storage.getOrdersByUserId(userId);
+      const { getSupabaseClient } = await import('./supabase-helper');
+      const supabase = getSupabaseClient();
+      
+      console.log('🔍 Fetching orders for user:', userId);
+      
+      const { data: orders, error } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+        
+      if (error) {
+        console.error('❌ Error fetching user orders:', error);
+        throw new Error(error.message);
+      }
+      
+      console.log(`✅ Found ${orders.length} orders for user ${userId}`);
       res.json(orders);
     } catch (error: any) {
       res.status(500).json({ message: "Error fetching orders: " + error.message });
@@ -263,15 +279,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/orders/:id", async (req, res) => {
     try {
-      const { id } = req.params;
-      const order = await storage.getOrder(id);
+      const { getOrderFromSupabase } = await import('./supabase-helper');
+      const order = await getOrderFromSupabase(req.params.id);
       
-      if (!order) {
-        return res.status(404).json({ message: "Order not found" });
-      }
-      
+      console.log('✅ Order retrieved from Supabase:', order.id);
       res.json(order);
     } catch (error: any) {
+      console.error('❌ Error fetching order from Supabase:', error.message);
       res.status(500).json({ message: "Error fetching order: " + error.message });
     }
   });
@@ -295,8 +309,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Update order with payment intent ID if orderId provided
       if (orderId) {
-        await storage.updateOrder(orderId, {
-          stripePaymentIntentId: paymentIntent.id,
+        const { updateOrderInSupabase } = await import('./supabase-helper');
+        await updateOrderInSupabase(orderId, {
+          stripe_payment_intent_id: paymentIntent.id,
         });
       }
       
@@ -320,9 +335,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const stlFileUrl = `https://formily.fakecdn.io/generated/${userId}-${timestamp}.stl`;
       
       // Simulate STL generation process (instant completion for demo)
-      await storage.updateOrder(orderId, {
+      const { updateOrderInSupabase } = await import('./supabase-helper');
+      await updateOrderInSupabase(orderId, {
         status: "completed",
-        stlFileUrl: stlFileUrl,
+        stl_file_url: stlFileUrl,
       });
       
       res.json({ 
