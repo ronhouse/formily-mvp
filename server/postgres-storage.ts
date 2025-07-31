@@ -73,13 +73,15 @@ export class PostgresStorage implements IStorage {
 
   async createOrder(insertOrder: InsertOrder): Promise<Order> {
     try {
+      console.log('🗄️  Inserting order into PostgreSQL with data:', insertOrder);
       const result = await this.db.insert(orders).values({
         ...insertOrder,
         status: 'pending'
       }).returning();
+      console.log('✅ PostgreSQL insert successful:', result[0].id);
       return result[0];
     } catch (error) {
-      console.error('Error creating order:', error);
+      console.error('❌ PostgreSQL insert error:', error);
       throw error;
     }
   }
