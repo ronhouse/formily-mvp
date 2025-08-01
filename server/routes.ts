@@ -354,8 +354,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           },
         ],
         mode: 'payment',
-        success_url: `http://localhost:5000/confirmation?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `http://localhost:5000/summary?orderId=${orderId}`,
+        success_url: `https://${process.env.REPLIT_DEV_DOMAIN}/confirmation?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `https://${process.env.REPLIT_DEV_DOMAIN}/summary?orderId=${orderId}`,
         metadata: {
           orderId: orderId,
           model_type: order.model_type,
@@ -380,12 +380,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Session ID is required" });
       }
 
+      console.log(`🔍 Processing payment success for session: ${sessionId}`);
+
       // Retrieve the checkout session
       const session = await stripe.checkout.sessions.retrieve(sessionId);
+      console.log(`💰 Session payment status: ${session.payment_status}`);
       
       if (session.payment_status === 'paid') {
         const orderId = session.metadata?.orderId;
         const paymentIntentId = session.payment_intent as string;
+        
+        console.log(`📦 Order ID from session: ${orderId}`);
         
         if (orderId) {
           // Update order with payment info and status
@@ -396,12 +401,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           });
           
           console.log(`✅ Payment successful for order: ${orderId}`);
+          console.log(`💳 Payment Intent ID: ${paymentIntentId}`);
         }
       }
 
       res.json({ 
         session,
-        orderId: session.metadata?.orderId 
+        orderId: session.metadata?.orderId,
+        paymentStatus: session.payment_status
       });
     } catch (error: any) {
       console.error("Error processing payment success:", error);
