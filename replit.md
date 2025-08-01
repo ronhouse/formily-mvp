@@ -113,11 +113,17 @@ Preferred communication style: Simple, everyday language.
 3. **Production Error Handling**: Enhanced error logging and non-crashing error handling in production
 4. **Environment Validation**: Production startup validates required environment variables (DATABASE_URL, STRIPE_SECRET_KEY)
 5. **Graceful Shutdown**: Added SIGTERM and SIGINT handlers for clean server shutdown
-6. **Static File Serving**: Verified build output serves correctly from dist/public/
-7. **Production Scripts**: Confirmed npm run build && npm run start workflow functions properly  
-8. **Build Output**: Server compiles to dist/server/index.js (34KB) using esbuild bundler
-9. **Static File Serving**: Fixed path issue - files copied to dist/server/public/ where server expects them
-10. **Port Configuration**: Server listens on 0.0.0.0:5000 with proper host binding for deployment
+6. **Static File Serving**: Fixed critical path mismatch - Vite builds to dist/public/ but server expects dist/server/public/
+7. **Build Process Fix**: Created automated scripts to copy client files to correct server location
+8. **Production Scripts**: Confirmed npm run build && npm run start workflow with file copying
+9. **Build Output**: Server compiles to dist/server/index.js (37KB) using esbuild bundler
+10. **Deployment Validation**: Added deploy-check.js script to verify all build requirements before deployment
+
+### Build Process Details
+- **Client Build**: Vite outputs to `dist/public/` (index.html + assets)
+- **Server Build**: esbuild outputs to `dist/server/index.js`
+- **File Copying**: Automated scripts copy client files to `dist/server/public/` where server expects them
+- **Validation**: Pre-deployment checks ensure all files are in correct locationsith proper host binding for deployment
 
 ### File Structure
 ```
