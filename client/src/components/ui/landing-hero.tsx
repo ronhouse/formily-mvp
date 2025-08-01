@@ -1,10 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowRight, Upload, Wand2, CreditCard, Download } from "lucide-react";
-import heroImage from "@assets/generated_images/Photo_to_3D_hero_banner_b2aa2e35.png";
-import huntingTrophyImage from "@assets/generated_images/3D_printed_hunting_trophy_f8d62b75.png";
-import petMemorialImage from "@assets/generated_images/3D_printed_pet_memorial_c1dadd77.png";
-import familyKeepsakeImage from "@assets/generated_images/3D_printed_family_keepsake_b65fdf6c.png";
 
 interface LandingHeroProps {
   onGetStarted: () => void;
@@ -26,7 +22,7 @@ export function LandingHero({ onGetStarted }: LandingHeroProps) {
         {/* Hero Process Image */}
         <div className="mb-8">
           <img 
-            src={heroImage}
+            src="/assets/generated_images/Photo_to_3D_hero_banner_b2aa2e35.png"
             alt="Photo to 3D printing transformation process" 
             className="rounded-2xl shadow-xl mx-auto max-w-4xl w-full"
           />
@@ -91,7 +87,7 @@ export function LandingHero({ onGetStarted }: LandingHeroProps) {
         <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
           <div className="text-center">
             <img 
-              src={huntingTrophyImage}
+              src="/assets/generated_images/3D_printed_hunting_trophy_f8d62b75.png"
               alt="Custom hunting trophy example" 
               className="rounded-lg shadow-lg mb-3 w-full h-48 object-cover"
             />
@@ -100,7 +96,7 @@ export function LandingHero({ onGetStarted }: LandingHeroProps) {
           </div>
           <div className="text-center">
             <img 
-              src={petMemorialImage}
+              src="/assets/generated_images/3D_printed_pet_memorial_c1dadd77.png"
               alt="Custom pet sculpture example" 
               className="rounded-lg shadow-lg mb-3 w-full h-48 object-cover"
             />
@@ -109,7 +105,7 @@ export function LandingHero({ onGetStarted }: LandingHeroProps) {
           </div>
           <div className="text-center">
             <img 
-              src={familyKeepsakeImage}
+              src="/assets/generated_images/3D_printed_family_keepsake_b65fdf6c.png"
               alt="Custom family keepsake example" 
               className="rounded-lg shadow-lg mb-3 w-full h-48 object-cover"
             />

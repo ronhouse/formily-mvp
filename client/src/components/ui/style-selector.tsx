@@ -1,9 +1,6 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Check } from "lucide-react";
-import huntingTrophyImage from "@assets/generated_images/3D_printed_hunting_trophy_f8d62b75.png";
-import petMemorialImage from "@assets/generated_images/3D_printed_pet_memorial_c1dadd77.png";
-import familyKeepsakeImage from "@assets/generated_images/3D_printed_family_keepsake_b65fdf6c.png";
 
 interface Style {
   id: string;
@@ -29,7 +26,7 @@ const STYLE_OPTIONS: Style[] = [
     dimensions: '6" x 4" x 4"',
     material: 'PLA+ Plastic',
     price: 34.99,
-    imageUrl: huntingTrophyImage,
+    imageUrl: '/assets/generated_images/3D_printed_hunting_trophy_f8d62b75.png',
   },
   {
     id: 'pet_sculpture',
@@ -38,7 +35,7 @@ const STYLE_OPTIONS: Style[] = [
     dimensions: '4" x 3" x 3"',
     material: 'PETG Plastic',
     price: 28.99,
-    imageUrl: petMemorialImage,
+    imageUrl: '/assets/generated_images/3D_printed_pet_memorial_c1dadd77.png',
   },
   {
     id: 'keepsake_3d',
@@ -47,7 +44,7 @@ const STYLE_OPTIONS: Style[] = [
     dimensions: '3" x 2" x 2"',
     material: 'PLA Plastic',
     price: 22.99,
-    imageUrl: familyKeepsakeImage,
+    imageUrl: '/assets/generated_images/3D_printed_family_keepsake_b65fdf6c.png',
   },
 ];
 
