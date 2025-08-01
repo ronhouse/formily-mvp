@@ -114,9 +114,10 @@ Preferred communication style: Simple, everyday language.
 4. **Environment Validation**: Production startup validates required environment variables (DATABASE_URL, STRIPE_SECRET_KEY)
 5. **Graceful Shutdown**: Added SIGTERM and SIGINT handlers for clean server shutdown
 6. **Static File Serving**: Verified build output serves correctly from dist/public/
-7. **Production Scripts**: Confirmed npm run build && npm run start workflow functions properly
-8. **Build Output**: Server compiles to dist/index.js (34KB) using esbuild bundler
-9. **Port Configuration**: Server listens on 0.0.0.0:5000 with proper host binding for deployment
+7. **Production Scripts**: Confirmed npm run build && npm run start workflow functions properly  
+8. **Build Output**: Server compiles to dist/server/index.js (34KB) using esbuild bundler
+9. **Static File Serving**: Fixed path issue - files copied to dist/server/public/ where server expects them
+10. **Port Configuration**: Server listens on 0.0.0.0:5000 with proper host binding for deployment
 
 ### File Structure
 ```
