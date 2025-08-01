@@ -346,7 +346,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               product_data: {
                 name: `Custom 3D ${order.model_type.charAt(0).toUpperCase() + order.model_type.slice(1)}`,
                 description: order.engraving_text ? `Engraved: "${order.engraving_text}"` : 'Custom 3D printed model',
-                images: [order.image_url],
+                // Remove images array since order.image_url may not be a valid public URL for Stripe
               },
               unit_amount: Math.round(parseFloat(order.total_amount) * 100), // Convert to cents
             },
