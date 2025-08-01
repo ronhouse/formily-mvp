@@ -9,6 +9,9 @@
 | Order Summary Screen      | ✅ Done       | Shows engraving, color, font, STL link                    |
 | Stripe Payment Flow       | ✅ Done       | Stripe Checkout in test mode with proper metadata         |
 | Partner Webhook (Print)   | ✅ Phase 3 Complete | Sends order to mock webhook, updates status + STL URL |
+| Stripe Payment Flow    | ✅ Done    | Test payment succeeded, order marked as 'paid' in Supabase |
+| STL Generation         | ✅ Done    | Confirmation page now downloads STL (mock for now)          |
+| Webhook Infrastructure | ✅ Done    | Endpoint built; real-time test succeeded                    |
 
 # 🔌 Current System Wiring (Phase 3)
 

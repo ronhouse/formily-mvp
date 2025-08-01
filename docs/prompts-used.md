@@ -65,3 +65,8 @@ Result: Agent generated SQL to drop and rebuild the table. Schema now matches ap
 
 ## Deployment Fix Prompt
 > Replit build fails due to ports and static path issues. Fix `serveStatic` directory mismatch and ensure express listens on 0.0.0.0:5000 in production.
+
+Stripe & STL Integration:
+- Prompted agent to fix checkout redirect issue (“Hmm... couldn't reach”)
+- Prompted agent to fix confirmation STL generation link (was pointing to example.com)
+- Final fix added dynamic domain detection, STL download button, and retry fallback
