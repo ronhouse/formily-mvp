@@ -383,6 +383,16 @@ export async function registerRoutes(app: Express): Promise<void> {
         return res.status(404).json({ message: "Order not found" });
       }
 
+      // Determine the base URL for Stripe redirects
+      const baseUrl = process.env.REPLIT_DOMAINS || process.env.REPLIT_DEV_DOMAIN || 'localhost:5000';
+      const protocol = baseUrl.includes('localhost') ? 'http' : 'https';
+      const successUrl = `${protocol}://${baseUrl}/confirmation?session_id={CHECKOUT_SESSION_ID}`;
+      const cancelUrl = `${protocol}://${baseUrl}/summary?orderId=${orderId}`;
+      
+      console.log(`🔗 Stripe Checkout URLs configured:`);
+      console.log(`   Success URL: ${successUrl}`);
+      console.log(`   Cancel URL: ${cancelUrl}`);
+
       const session = await stripe.checkout.sessions.create({
         payment_method_types: ['card'],
         line_items: [
@@ -400,8 +410,8 @@ export async function registerRoutes(app: Express): Promise<void> {
           },
         ],
         mode: 'payment',
-        success_url: `https://${process.env.REPLIT_DEV_DOMAIN}/confirmation?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `https://${process.env.REPLIT_DEV_DOMAIN}/summary?orderId=${orderId}`,
+        success_url: successUrl,
+        cancel_url: cancelUrl,
         metadata: {
           orderId: orderId,
           model_type: order.model_type,
@@ -410,7 +420,10 @@ export async function registerRoutes(app: Express): Promise<void> {
         },
       });
 
-      res.json({ url: session.url });
+      console.log(`✅ Stripe checkout session created: ${session.id}`);
+      console.log(`🔗 Checkout URL: ${session.url}`);
+      
+      res.json({ url: session.url, sessionId: session.id });
     } catch (error: any) {
       console.error("Error creating checkout session:", error);
       res.status(500).json({ message: "Error creating checkout session: " + error.message });

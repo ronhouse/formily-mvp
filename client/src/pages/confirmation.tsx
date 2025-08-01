@@ -18,6 +18,12 @@ export default function Confirmation() {
   // Get session ID from URL parameters
   const urlParams = new URLSearchParams(window.location.search);
   const sessionId = urlParams.get('session_id');
+  
+  // Log session ID for debugging
+  useEffect(() => {
+    console.log('🔍 Confirmation page loaded with session_id:', sessionId);
+    console.log('🌐 Current URL:', window.location.href);
+  }, [sessionId]);
 
   // Process payment success mutation
   const processPaymentMutation = useMutation({

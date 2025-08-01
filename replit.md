@@ -168,7 +168,7 @@ Preferred communication style: Simple, everyday language.
 
 **Current Status:** Full Stripe Checkout integration with test keys active and redirect URLs fixed for Replit deployment. Users can now complete payments via Stripe's hosted checkout page and properly return to confirmation page with immediate STL downloads.
 
-**Critical Fix Applied:** Updated Stripe redirect URLs to use proper Replit domain instead of localhost, resolving connection issues after payment completion.
+**Critical Fix Applied:** Updated Stripe redirect URLs to use proper Replit domain (REPLIT_DOMAINS/REPLIT_DEV_DOMAIN) instead of localhost, resolving connection issues after payment completion. Added comprehensive URL logging and session ID debugging for payment flow troubleshooting.
 
 **STL Generation Webhook Integration:**
 - ✅ Mock STL generation webhook function with order data payload
@@ -177,3 +177,10 @@ Preferred communication style: Simple, everyday language.
 - ✅ Real-time status updates on confirmation page with polling
 - ✅ Enhanced confirmation page with processing status indicators
 - ✅ Complete webhook simulation with order metadata transmission
+
+**Stripe Checkout URL Configuration (Aug 1, 2025):**
+- ✅ Fixed success_url/cancel_url to use REPLIT_DOMAINS for deployment compatibility
+- ✅ Added protocol detection (https for Replit domains, http for localhost)
+- ✅ Enhanced logging for Stripe checkout session creation and URLs
+- ✅ Added session_id debugging on confirmation page for troubleshooting
+- ✅ Production server correctly serves at 0.0.0.0:5000 for Replit deployments
