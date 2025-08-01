@@ -1,25 +1,26 @@
-import { useEffect } from "react";
+import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/contexts/AuthContext";
 import { STYLE_OPTIONS } from "@/components/ui/style-selector";
-import { Download, CheckCircle, ArrowLeft, ExternalLink } from "lucide-react";
+import { CheckCircle, ArrowLeft, CreditCard } from "lucide-react";
 
 export default function Summary() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { user: authUser } = useAuth();
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
 
   // Get order ID from URL parameters
   const urlParams = new URLSearchParams(window.location.search);
   const orderId = urlParams.get('orderId');
 
   // Fetch order details
-  const { data: order, isLoading, error, refetch } = useQuery({
+  const { data: order, isLoading, error } = useQuery({
     queryKey: ['/api/orders', orderId],
     queryFn: async () => {
       if (!orderId) throw new Error('Order ID is required');
@@ -27,56 +28,33 @@ export default function Summary() {
       return await response.json();
     },
     enabled: !!orderId,
-    refetchInterval: 2000, // Poll every 2 seconds until component unmounts or query succeeds
   });
 
-  // Trigger STL generation when component mounts
-  useEffect(() => {
-    const generateSTL = async () => {
-      if (!orderId || !authUser?.id) return;
-      
-      try {
-        await apiRequest('POST', '/api/generate-stl', {
-          orderId: orderId,
-          userId: authUser.id,
-        });
-        
-        toast({
-          title: "STL Generation Started",
-          description: "Your 3D model is being created...",
-        });
-        
-        // Start polling for updates
-        refetch();
-      } catch (error: any) {
-        toast({
-          title: "Error",
-          description: error.message || "Failed to start STL generation",
-          variant: "destructive",
-        });
-      }
-    };
-
-    generateSTL();
-  }, [orderId, authUser?.id, refetch, toast]);
-
-  const handleDownloadSTL = () => {
-    if (order?.stlFileUrl) {
-      // In a real app, this would trigger a download
-      // For demo purposes, we'll show a toast
+  // Create checkout session mutation
+  const createCheckoutSessionMutation = useMutation({
+    mutationFn: async (orderId: string) => {
+      const response = await apiRequest('POST', '/api/create-checkout-session', { orderId });
+      return await response.json();
+    },
+    onSuccess: (data) => {
+      // Redirect to Stripe Checkout
+      window.location.href = data.url;
+    },
+    onError: (error: any) => {
       toast({
-        title: "Download Started",
-        description: "Your STL file download has begun!",
+        title: "Payment Error",
+        description: error.message || "Failed to create checkout session",
+        variant: "destructive",
       });
-      
-      // Simulate file download
-      const link = document.createElement('a');
-      link.href = order.stlFileUrl;
-      link.download = `formily-${order.style}-${Date.now()}.stl`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-    }
+      setIsProcessingPayment(false);
+    },
+  });
+
+  const handleProceedToPayment = async () => {
+    if (!orderId) return;
+    
+    setIsProcessingPayment(true);
+    createCheckoutSessionMutation.mutate(orderId);
   };
 
   if (!orderId) {
@@ -128,8 +106,8 @@ export default function Summary() {
     );
   }
 
-  const selectedStyle = STYLE_OPTIONS.find(s => s.id === order.style);
-  const isSTLReady = order.status === 'completed' && order.stlFileUrl;
+  const selectedStyle = STYLE_OPTIONS.find(s => s.id === order.model_type || s.id === order.style);
+  const isPaid = order.status === 'paid' || order.status === 'completed';
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -138,7 +116,9 @@ export default function Summary() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
-              <h1 className="text-2xl font-bold text-primary">Formily</h1>
+              <Link href="/">
+                <h1 className="text-2xl font-bold text-primary cursor-pointer">Formily</h1>
+              </Link>
             </div>
             <nav className="hidden md:flex space-x-8">
               <Link href="/" className="text-gray-700 hover:text-primary px-3 py-2 text-sm font-medium">
@@ -154,21 +134,18 @@ export default function Summary() {
 
       {/* Main Content */}
       <main className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Success Header */}
+        {/* Header */}
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
-            <div className="bg-green-100 rounded-full p-3">
-              <CheckCircle className="w-8 h-8 text-green-600" />
+            <div className="bg-blue-100 rounded-full p-3">
+              <CheckCircle className="w-8 h-8 text-blue-600" />
             </div>
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            {isSTLReady ? "Your 3D Model is Ready!" : "Processing Your 3D Model..."}
+            Order Summary
           </h1>
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">
-            {isSTLReady 
-              ? "Your custom 3D printable file has been generated and is ready for download."
-              : "We're creating your custom 3D model. This usually takes just a few moments."
-            }
+            Review your order details and proceed to secure payment
           </p>
         </div>
 
@@ -178,9 +155,9 @@ export default function Summary() {
             <CardContent className="p-6">
               <h3 className="font-semibold text-gray-900 mb-4">Your Photo</h3>
               <div className="bg-gradient-to-br from-gray-100 to-gray-200 rounded-xl p-8 aspect-square flex items-center justify-center">
-                {order.photoUrl ? (
+                {order.image_url || order.photoUrl ? (
                   <img 
-                    src={order.photoUrl} 
+                    src={order.image_url || order.photoUrl} 
                     alt="Uploaded photo" 
                     className="max-w-full max-h-full rounded-lg shadow-lg object-cover"
                   />
@@ -207,11 +184,11 @@ export default function Summary() {
                   <p className="text-sm text-gray-600">{selectedStyle?.dimensions}</p>
                 </div>
 
-                {order.engravingText && (
+                {(order.engraving_text || order.engravingText) && (
                   <div>
                     <span className="text-sm font-medium text-gray-500">Engraving Text</span>
-                    <p className="text-gray-900 font-medium">"{order.engravingText}"</p>
-                    <p className="text-sm text-gray-600">Font: {order.fontStyle}</p>
+                    <p className="text-gray-900 font-medium">"{order.engraving_text || order.engravingText}"</p>
+                    <p className="text-sm text-gray-600">Font: {order.font_style || order.fontStyle || 'arial'}</p>
                   </div>
                 )}
 
@@ -230,6 +207,7 @@ export default function Summary() {
                   <div className="flex items-center mt-1">
                     <div className={`w-2 h-2 rounded-full mr-2 ${
                       order.status === 'completed' ? 'bg-green-500' : 
+                      order.status === 'paid' ? 'bg-blue-500' :
                       order.status === 'processing' ? 'bg-yellow-500' : 'bg-gray-500'
                     }`}></div>
                     <span className="text-gray-900 capitalize">{order.status}</span>
@@ -238,65 +216,66 @@ export default function Summary() {
 
                 <div className="border-t border-gray-200 pt-4">
                   <span className="text-sm font-medium text-gray-500">Total Amount</span>
-                  <p className="text-xl font-bold text-primary">${order.totalAmount}</p>
+                  <p className="text-xl font-bold text-primary">${order.total_amount || order.totalAmount}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* STL Download Section */}
+        {/* Payment Section */}
         <Card className="mt-8">
           <CardContent className="p-6">
             <div className="text-center">
               <h3 className="font-semibold text-gray-900 mb-4">
-                {isSTLReady ? "Download Your STL File" : "STL Generation in Progress"}
+                Secure Payment
               </h3>
               
-              {isSTLReady ? (
+              {!isPaid ? (
                 <div>
                   <p className="text-gray-600 mb-6">
-                    Your 3D printable file is ready! Download it and take it to any 3D printing service 
-                    or print it yourself if you have a 3D printer.
+                    Complete your order with secure payment processing powered by Stripe.
+                    Your 3D model will be generated immediately after payment.
                   </p>
                   
                   <div className="flex flex-col sm:flex-row gap-4 justify-center">
                     <Button 
-                      onClick={handleDownloadSTL}
+                      onClick={handleProceedToPayment}
                       size="lg"
-                      className="bg-green-600 hover:bg-green-700"
+                      className="bg-primary hover:bg-primary/90"
+                      disabled={isProcessingPayment}
                     >
-                      <Download className="w-5 h-5 mr-2" />
-                      Download STL File
+                      {isProcessingPayment ? (
+                        <div className="animate-spin w-5 h-5 mr-2 border-2 border-white border-t-transparent rounded-full"></div>
+                      ) : (
+                        <CreditCard className="w-5 h-5 mr-2" />
+                      )}
+                      {isProcessingPayment ? 'Processing...' : 'Proceed to Payment'}
                     </Button>
                     
-                    <Button 
-                      variant="outline" 
-                      size="lg"
-                      onClick={() => window.open('https://www.printables.com/', '_blank')}
-                    >
-                      <ExternalLink className="w-5 h-5 mr-2" />
-                      Find 3D Printing Services
-                    </Button>
+                    <Link href="/">
+                      <Button variant="outline" size="lg">
+                        <ArrowLeft className="w-5 h-5 mr-2" />
+                        Back to Customize
+                      </Button>
+                    </Link>
                   </div>
                   
                   <div className="mt-6 text-sm text-gray-500">
-                    <p className="mb-2">
-                      <strong>File:</strong> {order.stlFileUrl?.split('/').pop()}
-                    </p>
-                    <p>Compatible with all standard 3D printers and printing services</p>
+                    <p>🔒 Secure payment processing • SSL encrypted • No card data stored</p>
                   </div>
                 </div>
               ) : (
                 <div>
-                  <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
-                  <p className="text-gray-600 mb-4">
-                    We're processing your photo and creating your custom 3D model. 
-                    This usually takes just a few moments...
+                  <p className="text-green-600 font-medium mb-4">✅ Payment completed successfully!</p>
+                  <p className="text-gray-600 mb-6">
+                    Your 3D model is being generated and will be ready for download shortly.
                   </p>
-                  <p className="text-sm text-gray-500">
-                    Status: <span className="capitalize font-medium">{order.status}</span>
-                  </p>
+                  <Link href="/orders">
+                    <Button size="lg">
+                      View Order Status
+                    </Button>
+                  </Link>
                 </div>
               )}
             </div>
@@ -318,17 +297,6 @@ export default function Summary() {
           </Link>
         </div>
       </main>
-
-      {/* Footer */}
-      <footer className="bg-white border-t border-gray-200 mt-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 text-center">
-          <p className="text-sm text-gray-500">
-            Need help with 3D printing? Check out our{" "}
-            <a href="#" className="text-primary hover:underline">printing guide</a> or{" "}
-            <a href="#" className="text-primary hover:underline">contact support</a>.
-          </p>
-        </div>
-      </footer>
     </div>
   );
 }

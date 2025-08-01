@@ -9,6 +9,7 @@ import Home from "@/pages/home";
 import Checkout from "@/pages/checkout";
 import OrderHistory from "@/pages/order-history";
 import Summary from "@/pages/summary";
+import Confirmation from "@/pages/confirmation";
 
 function Router() {
   return (
@@ -17,6 +18,7 @@ function Router() {
       <Route path="/checkout" component={Checkout} />
       <Route path="/orders" component={OrderHistory} />
       <Route path="/summary" component={Summary} />
+      <Route path="/confirmation" component={Confirmation} />
       <Route component={NotFound} />
     </Switch>
   );

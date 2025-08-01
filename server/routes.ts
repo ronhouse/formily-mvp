@@ -10,7 +10,7 @@ import { z } from "zod";
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder_replace_with_real_stripe_secret_key';
 
 const stripe = new Stripe(stripeSecretKey, {
-  apiVersion: "2025-06-30.basil",
+  apiVersion: "2024-06-20",
 });
 
 // Configure multer for file uploads
@@ -318,6 +318,94 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json({ clientSecret: paymentIntent.client_secret });
     } catch (error: any) {
       res.status(500).json({ message: "Error creating payment intent: " + error.message });
+    }
+  });
+
+  // Create Stripe Checkout Session
+  app.post("/api/create-checkout-session", async (req, res) => {
+    try {
+      const { orderId } = req.body;
+      
+      if (!orderId) {
+        return res.status(400).json({ message: "Order ID is required" });
+      }
+
+      // Get order details from Supabase
+      const { getOrderFromSupabase } = await import('./supabase-helper');
+      const order = await getOrderFromSupabase(orderId);
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ['card'],
+        line_items: [
+          {
+            price_data: {
+              currency: 'usd',
+              product_data: {
+                name: `Custom 3D ${order.model_type.charAt(0).toUpperCase() + order.model_type.slice(1)}`,
+                description: order.engraving_text ? `Engraved: "${order.engraving_text}"` : 'Custom 3D printed model',
+                images: [order.image_url],
+              },
+              unit_amount: Math.round(parseFloat(order.total_amount) * 100), // Convert to cents
+            },
+            quantity: 1,
+          },
+        ],
+        mode: 'payment',
+        success_url: `http://localhost:5000/confirmation?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `http://localhost:5000/summary?orderId=${orderId}`,
+        metadata: {
+          orderId: orderId,
+          model_type: order.model_type,
+          engraving_text: order.engraving_text || '',
+          total_amount: order.total_amount,
+        },
+      });
+
+      res.json({ url: session.url });
+    } catch (error: any) {
+      console.error("Error creating checkout session:", error);
+      res.status(500).json({ message: "Error creating checkout session: " + error.message });
+    }
+  });
+
+  // Handle successful payment
+  app.post("/api/payment-success", async (req, res) => {
+    try {
+      const { sessionId } = req.body;
+      
+      if (!sessionId) {
+        return res.status(400).json({ message: "Session ID is required" });
+      }
+
+      // Retrieve the checkout session
+      const session = await stripe.checkout.sessions.retrieve(sessionId);
+      
+      if (session.payment_status === 'paid') {
+        const orderId = session.metadata?.orderId;
+        const paymentIntentId = session.payment_intent as string;
+        
+        if (orderId) {
+          // Update order with payment info and status
+          const { updateOrderInSupabase } = await import('./supabase-helper');
+          await updateOrderInSupabase(orderId, {
+            stripe_payment_intent_id: paymentIntentId,
+            status: 'paid',
+          });
+          
+          console.log(`✅ Payment successful for order: ${orderId}`);
+        }
+      }
+
+      res.json({ 
+        session,
+        orderId: session.metadata?.orderId 
+      });
+    } catch (error: any) {
+      console.error("Error processing payment success:", error);
+      res.status(500).json({ message: "Error processing payment: " + error.message });
     }
   });
 
