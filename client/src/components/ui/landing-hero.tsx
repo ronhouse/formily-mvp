@@ -1,6 +1,10 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ArrowRight, Upload, Wand2, CreditCard, Download } from "lucide-react";
+import heroImage from "@assets/generated_images/Photo_to_3D_hero_banner_b2aa2e35.png";
+import huntingTrophyImage from "@assets/generated_images/3D_printed_hunting_trophy_f8d62b75.png";
+import petMemorialImage from "@assets/generated_images/3D_printed_pet_memorial_c1dadd77.png";
+import familyKeepsakeImage from "@assets/generated_images/3D_printed_family_keepsake_b65fdf6c.png";
 
 interface LandingHeroProps {
   onGetStarted: () => void;
@@ -18,6 +22,16 @@ export function LandingHero({ onGetStarted }: LandingHeroProps) {
           Upload any photo and transform it into a hunting trophy, pet sculpture, or 3D keepsake. 
           Professional 3D printing quality, delivered as downloadable STL files.
         </p>
+        
+        {/* Hero Process Image */}
+        <div className="mb-8">
+          <img 
+            src={heroImage}
+            alt="Photo to 3D printing transformation process" 
+            className="rounded-2xl shadow-xl mx-auto max-w-4xl w-full"
+          />
+        </div>
+        
         <Button 
           size="lg" 
           className="text-lg px-8 py-4"
@@ -74,22 +88,34 @@ export function LandingHero({ onGetStarted }: LandingHeroProps) {
       {/* Sample Gallery */}
       <div className="text-center">
         <h2 className="text-2xl font-bold text-gray-900 mb-6">See What Others Have Created</h2>
-        <div className="grid md:grid-cols-3 gap-4 max-w-3xl mx-auto">
-          <img 
-            src="https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&h=200" 
-            alt="Custom keychain example" 
-            className="rounded-lg shadow-md"
-          />
-          <img 
-            src="https://images.unsplash.com/photo-1601758228041-f3b2795255f1?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&h=200" 
-            alt="Custom pet tag example" 
-            className="rounded-lg shadow-md"
-          />
-          <img 
-            src="https://images.unsplash.com/photo-1578662996442-48f60103fc96?ixlib=rb-4.0.3&auto=format&fit=crop&w=300&h=200" 
-            alt="Custom plaque example" 
-            className="rounded-lg shadow-md"
-          />
+        <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+          <div className="text-center">
+            <img 
+              src={huntingTrophyImage}
+              alt="Custom hunting trophy example" 
+              className="rounded-lg shadow-lg mb-3 w-full h-48 object-cover"
+            />
+            <h3 className="font-semibold text-gray-900 mb-1">Hunting Trophy</h3>
+            <p className="text-sm text-gray-600">Detailed busts from hunt photos</p>
+          </div>
+          <div className="text-center">
+            <img 
+              src={petMemorialImage}
+              alt="Custom pet sculpture example" 
+              className="rounded-lg shadow-lg mb-3 w-full h-48 object-cover"
+            />
+            <h3 className="font-semibold text-gray-900 mb-1">Pet Sculpture</h3>
+            <p className="text-sm text-gray-600">Memorial keepsakes of beloved pets</p>
+          </div>
+          <div className="text-center">
+            <img 
+              src={familyKeepsakeImage}
+              alt="Custom family keepsake example" 
+              className="rounded-lg shadow-lg mb-3 w-full h-48 object-cover"
+            />
+            <h3 className="font-semibold text-gray-900 mb-1">3D Keepsake</h3>
+            <p className="text-sm text-gray-600">Custom figurines from family moments</p>
+          </div>
         </div>
       </div>
     </div>
