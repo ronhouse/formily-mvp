@@ -29,7 +29,7 @@ Preferred communication style: Simple, everyday language.
 - **Landing Page**: Hero section with process overview and sample gallery
 - **Multi-Step Workflow**: Upload → Style Selection → Customization → Payment
 - **File Upload**: Drag-and-drop with preview, validation, and progress feedback
-- **Style Selection**: Visual cards for keychain/tag/plaque with pricing and specs
+- **Style Selection**: Visual cards for hunting trophy/pet sculpture/3D keepsake with pricing and specs
 - **Customization**: Text engraving, font styles, colors, print quality options
 - **Secure Checkout**: Stripe Payment Elements with billing address collection
 - **Order Confirmation**: Modal with order details and next steps
@@ -53,7 +53,7 @@ Preferred communication style: Simple, everyday language.
 
 1. **User Onboarding**: Auto-generates anonymous user on first visit
 2. **Photo Upload**: Drag-and-drop interface with file validation and preview
-3. **Style Selection**: Interactive cards showing keychain ($12.99), pet tag ($15.99), plaque ($24.99)
+3. **Style Selection**: Interactive cards showing hunting trophy ($34.99), pet sculpture ($28.99), 3D keepsake ($22.99)
 4. **Customization**: Optional engraving text, font selection, color picker, quality options
 5. **Order Creation**: Generates order with specifications and pricing calculations
 6. **Payment**: Stripe checkout with billing address and payment confirmation
@@ -177,6 +177,14 @@ Preferred communication style: Simple, everyday language.
 - ✅ Real-time status updates on confirmation page with polling
 - ✅ Enhanced confirmation page with processing status indicators
 - ✅ Complete webhook simulation with order metadata transmission
+
+**Product Type Update (Aug 1, 2025):**
+- ✅ **Replaced Generic Products with Vision Roadmap Types**: Updated dropdown from keychain/tag/plaque to hunting trophy/pet sculpture/3D keepsake
+- ✅ **Aligned with Target Audiences**: Product types now match hunters, pet owners, and families from Vision Roadmap
+- ✅ **Updated Pricing Structure**: Hunting Trophy ($34.99), Pet Sculpture ($28.99), 3D Keepsake ($22.99)
+- ✅ **Enhanced Product Descriptions**: Added detailed descriptions matching target use cases
+- ✅ **Maintained Database Compatibility**: All new model_type values save properly to Supabase
+- ✅ **Updated Landing Page Copy**: Hero section and process descriptions reflect new product focus
 
 **Stripe Checkout URL Configuration (Aug 1, 2025):**
 - ✅ Fixed success_url/cancel_url to use REPLIT_DOMAINS for deployment compatibility

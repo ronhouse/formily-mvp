@@ -15,7 +15,7 @@ export function LandingHero({ onGetStarted }: LandingHeroProps) {
           <span className="text-primary">Custom 3D Models</span>
         </h1>
         <p className="text-xl text-gray-600 max-w-3xl mx-auto mb-8">
-          Upload any photo and transform it into a personalized keychain, pet tag, or decorative plaque. 
+          Upload any photo and transform it into a hunting trophy, pet sculpture, or 3D keepsake. 
           Professional 3D printing quality, delivered as downloadable STL files.
         </p>
         <Button 
@@ -46,7 +46,7 @@ export function LandingHero({ onGetStarted }: LandingHeroProps) {
               <Wand2 className="w-6 h-6" />
             </div>
             <h3 className="font-semibold text-gray-900 mb-2">2. Customize Style</h3>
-            <p className="text-sm text-gray-600">Pick keychain, tag, or plaque format with engraving</p>
+            <p className="text-sm text-gray-600">Choose trophy, sculpture, or keepsake format with engraving</p>
           </CardContent>
         </Card>
         
