@@ -25,3 +25,15 @@ Next:
 - Stripe webhook wiring
 - Order status updates
 - Optional: Admin dashboard or fulfillment automations
+
+## August 1 – Stripe Checkout Complete + STL Flow Locked In
+
+- ✅ Integrated Stripe Checkout in test mode (API keys + .env)
+- ✅ Created checkout session endpoint with order metadata
+- ✅ Wired "Proceed to Payment" button on summary screen
+- ✅ Redirected to Stripe and returned to confirmation page post-payment
+- ✅ Confirmed Supabase status updates from "pending" to "paid"
+- ✅ Mock STL file available on confirmation and order history pages
+- ✅ Verified full end-to-end test with successful payment flow
+- 🛠️ Noted temporary error on first attempt (invalid return URL), now resolved
+- 🔜 Phase 3 kickoff pending (mock webhook to printer service)

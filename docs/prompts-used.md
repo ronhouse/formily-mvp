@@ -44,3 +44,15 @@ Result: Agent confirmed connection was hitting Replit PostgreSQL. Fixed environm
 > The Supabase orders table is missing fields like color, font, and stl_file_url. Can you recreate the table to match the app’s full schema?
 
 Result: Agent generated SQL to drop and rebuild the table. Schema now matches app and receives real data.
+
+### Stripe Checkout Integration
+
+**Prompt:**  
+“I'm thinking stripe but I feel like I need to understand this better… would I still be able to test the flow without inserting payment?”
+
+**Result:**  
+- Agent wired up full Stripe Checkout in test mode using Stripe API keys
+- Created checkout session with metadata
+- Added frontend payment button and post-payment confirmation route
+- Stripe redirect and return flow tested successfully with test card
+- Supabase order status properly updated to `paid` on success
