@@ -57,7 +57,10 @@ export default function Confirmation() {
       return await response.json();
     },
     enabled: !!processPaymentMutation.data?.orderId,
-    refetchInterval: order?.status === 'ready' ? false : 2000, // Poll every 2 seconds until STL is ready
+    refetchInterval: (data) => {
+      // Poll every 2 seconds until STL is ready
+      return data?.status === 'ready' ? false : 2000;
+    },
   });
 
   const handleDownloadSTL = () => {
@@ -237,10 +240,10 @@ export default function Confirmation() {
 
                       <div className="mt-6 text-sm text-gray-500 bg-gray-50 rounded-lg p-4">
                         <p className="font-medium text-gray-700 mb-2">File Information:</p>
-                        <p>• File: {order.stl_file_url?.split('/').pop()}</p>
+                        <p>• File: {order?.stl_file_url?.split('/').pop()}</p>
                         <p>• Compatible with all standard 3D printers</p>
-                        <p>• Model: {selectedStyle?.name} ({order.model_type})</p>
-                        {order.engraving_text && <p>• Engraving: "{order.engraving_text}"</p>}
+                        <p>• Model: {selectedStyle?.name} ({order?.model_type})</p>
+                        {order?.engraving_text && <p>• Engraving: "{order.engraving_text}"</p>}
                       </div>
                     </div>
                   ) : (
