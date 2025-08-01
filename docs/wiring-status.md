@@ -1,13 +1,11 @@
-# Wiring Status – Formily MVP
-
-| Feature                | Status        | Notes                                                         |
-|------------------------|---------------|---------------------------------------------------------------|
-| Anonymous Auth         | ✅ Done        | Supabase session working                                      |
-| Image Upload           | ✅ Done        | Supabase preview confirmed                                    |
-| Model Type Dropdown    | ✅ Done        | 3 options: Keychain, Tag, Plaque                              |
-| Engraving Input        | ✅ Done        | Length not yet validated                                      |
-| Submit to DB           | ✅ Done        | Fully integrated with Supabase orders table                   |
-| Mock STL Gen URL       | ✅ Done        | Linked in confirmation + order history                        |
-| Order Summary Screen   | ✅ Done        | Shows model, engraving, STL link                              |
-| Stripe Payment Flow    | ✅ Done        | Test mode complete: summary → checkout → confirmation         |
-| Partner Webhook (Print)| ❌ Phase 3     | Triggers after payment for real STL generation + fulfillment  |
+| Feature                    | Status       | Notes                                                     |
+|----------------------------|--------------|------------------------------------------------------------|
+| Anonymous Auth            | ✅ Done       | Supabase session working                                  |
+| Image Upload              | ✅ Done       | Fully integrated with Supabase Storage                    |
+| Model Type Dropdown       | ✅ Done       | 3 options: Keychain, Tag, Plaque                          |
+| Engraving Input           | ✅ Done       | Input captured and stored                                 |
+| Submit to DB              | ✅ Done       | Full payload written to Supabase                          |
+| Mock STL Gen URL          | ✅ Done       | Visible post-checkout & in order history                  |
+| Order Summary Screen      | ✅ Done       | Shows engraving, color, font, STL link                    |
+| Stripe Payment Flow       | ✅ Done       | Stripe Checkout in test mode with proper metadata         |
+| Partner Webhook (Print)   | ✅ Phase 3 Complete | Sends order to mock webhook, updates status + STL URL |
