@@ -57,7 +57,7 @@ export default function Confirmation() {
       return await response.json();
     },
     enabled: !!processPaymentMutation.data?.orderId,
-    refetchInterval: 3000, // Poll every 3 seconds for STL generation updates
+    refetchInterval: order?.status === 'ready' ? false : 2000, // Poll every 2 seconds until STL is ready
   });
 
   const handleDownloadSTL = () => {
@@ -126,7 +126,7 @@ export default function Confirmation() {
   }
 
   const selectedStyle = STYLE_OPTIONS.find(s => s.id === order?.model_type);
-  const isSTLReady = order?.stl_file_url;
+  const isSTLReady = order?.status === 'ready' && order?.stl_file_url;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -205,6 +205,12 @@ export default function Confirmation() {
                   
                   {isSTLReady ? (
                     <div>
+                      <div className="flex justify-center mb-4">
+                        <div className="bg-green-100 rounded-full p-3">
+                          <CheckCircle className="w-6 h-6 text-green-600" />
+                        </div>
+                      </div>
+                      <p className="text-green-600 font-medium mb-2">STL Generation Complete!</p>
                       <p className="text-gray-600 mb-6">
                         Your custom 3D printable file is ready for download!
                       </p>
@@ -228,16 +234,42 @@ export default function Confirmation() {
                           Find 3D Printing Services
                         </Button>
                       </div>
+
+                      <div className="mt-6 text-sm text-gray-500 bg-gray-50 rounded-lg p-4">
+                        <p className="font-medium text-gray-700 mb-2">File Information:</p>
+                        <p>• File: {order.stl_file_url?.split('/').pop()}</p>
+                        <p>• Compatible with all standard 3D printers</p>
+                        <p>• Model: {selectedStyle?.name} ({order.model_type})</p>
+                        {order.engraving_text && <p>• Engraving: "{order.engraving_text}"</p>}
+                      </div>
                     </div>
                   ) : (
                     <div>
                       <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
                       <p className="text-gray-600 mb-4">
-                        We're processing your photo and creating your custom 3D model. 
-                        This usually takes just a few moments...
+                        {order?.status === 'paid' ? 
+                          'Payment confirmed! Now generating your custom 3D model...' :
+                          'We\'re processing your photo and creating your custom 3D model...'
+                        }
                       </p>
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                        <p className="text-sm text-blue-800 font-medium mb-2">Processing Status:</p>
+                        <div className="flex items-center space-x-2">
+                          <div className={`w-2 h-2 rounded-full ${
+                            order?.status === 'paid' ? 'bg-green-500' : 'bg-gray-400'
+                          }`}></div>
+                          <span className="text-sm text-blue-700">Payment Confirmed</span>
+                        </div>
+                        <div className="flex items-center space-x-2 mt-1">
+                          <div className={`w-2 h-2 rounded-full ${
+                            order?.status === 'ready' ? 'bg-green-500' : 
+                            order?.status === 'paid' ? 'bg-yellow-500 animate-pulse' : 'bg-gray-400'
+                          }`}></div>
+                          <span className="text-sm text-blue-700">STL Generation</span>
+                        </div>
+                      </div>
                       <p className="text-sm text-gray-500">
-                        You can also check your order status anytime in your order history.
+                        This usually takes 2-5 minutes. The page will update automatically when ready.
                       </p>
                     </div>
                   )}

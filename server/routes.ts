@@ -13,6 +13,52 @@ const stripe = new Stripe(stripeSecretKey, {
   apiVersion: "2024-06-20",
 });
 
+// Mock STL generation webhook function
+async function triggerSTLGeneration(order: any) {
+  try {
+    console.log(`🎯 Sending STL generation request for order: ${order.id}`);
+    
+    const webhookPayload = {
+      order_id: order.id,
+      image_url: order.image_url,
+      model_type: order.model_type,
+      engraving_text: order.engraving_text,
+      font_style: order.font_style,
+      color: order.color,
+      quality: order.quality,
+      specifications: order.specifications
+    };
+
+    console.log(`📋 STL Generation Payload:`, JSON.stringify(webhookPayload, null, 2));
+
+    // Simulate webhook call to STL generator
+    // In production, this would be a real HTTP request to your STL generation service
+    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate processing time
+
+    // Mock response from STL generator
+    const mockResponse = {
+      status: "ready",
+      stl_file_url: `https://example.com/generated-stl-files/${order.id}-${order.model_type}.stl`
+    };
+
+    console.log(`🎉 STL Generation Response:`, JSON.stringify(mockResponse, null, 2));
+
+    // Update order with STL generation results
+    const { updateOrderInSupabase } = await import('./supabase-helper');
+    await updateOrderInSupabase(order.id, {
+      status: 'ready',
+      stl_file_url: mockResponse.stl_file_url
+    });
+
+    console.log(`✅ Order ${order.id} updated with STL file: ${mockResponse.stl_file_url}`);
+    
+    return mockResponse;
+  } catch (error) {
+    console.error(`❌ STL generation failed for order ${order.id}:`, error);
+    throw error;
+  }
+}
+
 // Configure multer for file uploads
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -394,7 +440,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         if (orderId) {
           // Update order with payment info and status
-          const { updateOrderInSupabase } = await import('./supabase-helper');
+          const { updateOrderInSupabase, getOrderFromSupabase } = await import('./supabase-helper');
           await updateOrderInSupabase(orderId, {
             stripe_payment_intent_id: paymentIntentId,
             status: 'paid',
@@ -402,6 +448,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           console.log(`✅ Payment successful for order: ${orderId}`);
           console.log(`💳 Payment Intent ID: ${paymentIntentId}`);
+
+          // Trigger STL generation webhook
+          try {
+            const order = await getOrderFromSupabase(orderId);
+            if (order) {
+              console.log(`🔨 Triggering STL generation for order: ${orderId}`);
+              await triggerSTLGeneration(order);
+            }
+          } catch (error) {
+            console.error(`❌ Error triggering STL generation:`, error);
+            // Don't fail the payment if STL generation fails
+          }
         }
       }
 
@@ -443,6 +501,84 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       res.status(500).json({ message: "Error generating STL: " + error.message });
+    }
+  });
+
+  // Direct order status update endpoint (for testing STL generation)
+  app.post("/api/orders/:orderId/update-status", async (req, res) => {
+    try {
+      const { orderId } = req.params;
+      const { status, stl_file_url } = req.body;
+      
+      console.log(`📝 Updating order ${orderId} status to: ${status}`);
+      
+      const { updateOrderInSupabase } = await import('./supabase-helper');
+      await updateOrderInSupabase(orderId, {
+        status,
+        stl_file_url: stl_file_url || null
+      });
+      
+      res.json({ 
+        message: "Order status updated", 
+        orderId, 
+        status,
+        stl_file_url 
+      });
+    } catch (error: any) {
+      console.error("Error updating order status:", error);
+      res.status(500).json({ message: "Error updating order: " + error.message });
+    }
+  });
+
+  // Mock STL Generator Webhook Endpoint (for testing purposes)
+  app.post("/api/webhook/stl-generator", async (req, res) => {
+    try {
+      const { order_id, image_url, model_type, engraving_text, font_style, color, quality, specifications } = req.body;
+      
+      console.log(`🔨 Mock STL Generator received webhook for order: ${order_id}`);
+      console.log(`📊 Processing: ${model_type} with ${engraving_text ? `engraving "${engraving_text}"` : 'no engraving'}`);
+      
+      // Simulate processing time
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      const response = {
+        status: "ready",
+        stl_file_url: `https://example.com/generated-stl-files/${order_id}-${model_type}.stl`,
+        processing_time: "2.1s",
+        file_size: "1.2MB"
+      };
+      
+      console.log(`✅ STL generation completed for order: ${order_id}`);
+      res.json(response);
+    } catch (error: any) {
+      console.error("Error in mock STL generator:", error);
+      res.status(500).json({ error: "STL generation failed", message: error.message });
+    }
+  });
+
+  // Manual trigger for STL generation (for testing)
+  app.post("/api/trigger-stl-generation/:orderId", async (req, res) => {
+    try {
+      const { orderId } = req.params;
+      
+      const { getOrderFromSupabase } = await import('./supabase-helper');
+      const order = await getOrderFromSupabase(orderId);
+      
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+      
+      console.log(`🔨 Manual STL generation trigger for order: ${orderId}`);
+      const result = await triggerSTLGeneration(order);
+      
+      res.json({ 
+        message: "STL generation completed", 
+        order_id: orderId,
+        result 
+      });
+    } catch (error: any) {
+      console.error("Error triggering STL generation:", error);
+      res.status(500).json({ message: "Error triggering STL generation: " + error.message });
     }
   });
 
