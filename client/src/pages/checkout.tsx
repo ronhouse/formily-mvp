@@ -38,11 +38,29 @@ const CheckoutForm = ({ order, onPaymentSuccess }: CheckoutFormProps) => {
 
   const generateSTLMutation = useMutation({
     mutationFn: async (orderId: string) => {
+      // Auto-detect base URL and log full request details
+      const baseUrl = window.location.origin;
+      const fullUrl = `${baseUrl}/api/generate-stl`;
+      
+      console.log(`🔧 Checkout STL generation request:`, {
+        orderId,
+        baseUrl,
+        fullUrl,
+        timestamp: new Date().toISOString()
+      });
+      
       const response = await apiRequest('POST', '/api/generate-stl', { orderId });
-      return await response.json();
+      const result = await response.json();
+      
+      console.log(`✅ Checkout STL generation response:`, result);
+      return result;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      console.log(`🎉 Checkout STL generation completed:`, data);
       queryClient.invalidateQueries({ queryKey: ['/api/orders'] });
+    },
+    onError: (error: any) => {
+      console.error(`❌ Checkout STL generation failed:`, error);
     },
   });
 

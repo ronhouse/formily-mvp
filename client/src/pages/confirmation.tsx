@@ -3,7 +3,7 @@ import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/contexts/AuthContext";
 import { STYLE_OPTIONS } from "@/components/ui/style-selector";
@@ -14,6 +14,7 @@ export default function Confirmation() {
   const { toast } = useToast();
   const { user: authUser } = useAuth();
   const [paymentProcessed, setPaymentProcessed] = useState(false);
+  const queryClient = useQueryClient();
 
   // Get session ID from URL parameters
   const urlParams = new URLSearchParams(window.location.search);
@@ -69,8 +70,51 @@ export default function Confirmation() {
     },
   });
 
+  // Manual STL generation mutation with proper URL detection
+  const generateSTLMutation = useMutation({
+    mutationFn: async (orderId: string) => {
+      // Auto-detect base URL
+      const baseUrl = window.location.origin;
+      const fullUrl = `${baseUrl}/api/generate-stl`;
+      
+      console.log(`🔧 Manual STL generation request:`, {
+        orderId,
+        baseUrl,
+        fullUrl,
+        userId: authUser?.id
+      });
+      
+      const response = await apiRequest('POST', '/api/generate-stl', { 
+        orderId, 
+        userId: authUser?.id 
+      });
+      
+      const result = await response.json();
+      console.log(`✅ STL generation response:`, result);
+      return result;
+    },
+    onSuccess: (data) => {
+      console.log(`🎉 STL generation completed:`, data);
+      toast({
+        title: "STL Generation Started!",
+        description: "Your 3D model is being generated. The page will update automatically.",
+      });
+      // Invalidate queries to refetch order status
+      queryClient.invalidateQueries({ queryKey: ['/api/orders'] });
+    },
+    onError: (error: any) => {
+      console.error(`❌ STL generation failed:`, error);
+      toast({
+        title: "STL Generation Failed",
+        description: error.message || "Failed to generate STL file. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleDownloadSTL = () => {
     if (order?.stl_file_url) {
+      console.log(`📥 Downloading STL file:`, order.stl_file_url);
       const link = document.createElement('a');
       link.href = order.stl_file_url;
       link.download = `formily-${order.model_type}-${order.id.slice(-8)}.stl`;
@@ -82,6 +126,13 @@ export default function Confirmation() {
         title: "Download Started",
         description: "Your STL file download has begun!",
       });
+    }
+  };
+
+  const handleGenerateSTL = () => {
+    if (order?.id) {
+      console.log(`🔨 Manually triggering STL generation for order:`, order.id);
+      generateSTLMutation.mutate(order.id);
     }
   };
 
@@ -261,6 +312,30 @@ export default function Confirmation() {
                           'We\'re processing your photo and creating your custom 3D model...'
                         }
                       </p>
+                      
+                      {/* Manual STL Generation Button */}
+                      {order?.status === 'paid' && (
+                        <div className="mt-4">
+                          <Button 
+                            onClick={handleGenerateSTL}
+                            disabled={generateSTLMutation.isPending}
+                            variant="outline"
+                            size="sm"
+                          >
+                            {generateSTLMutation.isPending ? (
+                              <>
+                                <div className="animate-spin w-4 h-4 border-2 border-primary border-t-transparent rounded-full mr-2"></div>
+                                Generating...
+                              </>
+                            ) : (
+                              'Retry STL Generation'
+                            )}
+                          </Button>
+                          <p className="text-xs text-gray-500 mt-2">
+                            If generation seems stuck, try clicking the button above
+                          </p>
+                        </div>
+                      )}
                       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
                         <p className="text-sm text-blue-800 font-medium mb-2">Processing Status:</p>
                         <div className="flex items-center space-x-2">
