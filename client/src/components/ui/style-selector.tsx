@@ -26,7 +26,7 @@ const STYLE_OPTIONS: Style[] = [
     dimensions: '6" x 4" x 4"',
     material: 'PLA+ Plastic',
     price: 34.99,
-    imageUrl: '/assets/generated_images/3D_printed_hunting_trophy_f8d62b75.png',
+    imageUrl: '/assets/generated_images/3D_printed_hunting_trophy_f8d62b75.png?v=2',
   },
   {
     id: 'pet_sculpture',
@@ -35,7 +35,7 @@ const STYLE_OPTIONS: Style[] = [
     dimensions: '4" x 3" x 3"',
     material: 'PETG Plastic',
     price: 28.99,
-    imageUrl: '/assets/generated_images/3D_printed_pet_memorial_c1dadd77.png',
+    imageUrl: '/assets/generated_images/3D_printed_pet_memorial_c1dadd77.png?v=2',
   },
   {
     id: 'keepsake_3d',
@@ -44,7 +44,7 @@ const STYLE_OPTIONS: Style[] = [
     dimensions: '3" x 2" x 2"',
     material: 'PLA Plastic',
     price: 22.99,
-    imageUrl: '/assets/generated_images/3D_printed_family_keepsake_b65fdf6c.png',
+    imageUrl: '/assets/generated_images/3D_printed_family_keepsake_b65fdf6c.png?v=2',
   },
 ];
 
