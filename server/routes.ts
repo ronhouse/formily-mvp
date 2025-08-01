@@ -35,11 +35,17 @@ async function triggerSTLGeneration(order: any) {
     // In production, this would be a real HTTP request to your STL generation service
     await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate processing time
 
-    // Mock response from STL generator
+    // Generate proper mock STL URL with domain detection
+    const baseUrl = process.env.REPLIT_DOMAINS || process.env.REPLIT_DEV_DOMAIN || 'localhost:5000';
+    const protocol = baseUrl.includes('localhost') ? 'http' : 'https';
+    const timestamp = Date.now();
+    
     const mockResponse = {
       status: "ready",
-      stl_file_url: `https://example.com/generated-stl-files/${order.id}-${order.model_type}.stl`
+      stl_file_url: `${protocol}://${baseUrl}/api/download-stl/${order.id}-${order.model_type}-${timestamp}.stl`
     };
+    
+    console.log(`🔗 Generated STL URL: ${mockResponse.stl_file_url}`);
 
     console.log(`🎉 STL Generation Response:`, JSON.stringify(mockResponse, null, 2));
 
@@ -496,9 +502,13 @@ export async function registerRoutes(app: Express): Promise<void> {
         return res.status(400).json({ message: "Order ID is required" });
       }
       
-      // Generate mock STL URL with user ID and timestamp
+      // Generate proper mock STL URL with domain detection
+      const baseUrl = process.env.REPLIT_DOMAINS || process.env.REPLIT_DEV_DOMAIN || 'localhost:5000';
+      const protocol = baseUrl.includes('localhost') ? 'http' : 'https';
       const timestamp = Date.now();
-      const stlFileUrl = `https://formily.fakecdn.io/generated/${userId}-${timestamp}.stl`;
+      const stlFileUrl = `${protocol}://${baseUrl}/api/download-stl/${orderId}-${userId || 'user'}-${timestamp}.stl`;
+      
+      console.log(`🔗 Generated STL URL: ${stlFileUrl}`);
       
       // Simulate STL generation process (instant completion for demo)
       const { updateOrderInSupabase } = await import('./supabase-helper');
@@ -554,12 +564,19 @@ export async function registerRoutes(app: Express): Promise<void> {
       // Simulate processing time
       await new Promise(resolve => setTimeout(resolve, 2000));
       
+      // Generate proper mock STL URL
+      const baseUrl = process.env.REPLIT_DOMAINS || process.env.REPLIT_DEV_DOMAIN || 'localhost:5000';
+      const protocol = baseUrl.includes('localhost') ? 'http' : 'https';
+      const timestamp = Date.now();
+      
       const response = {
         status: "ready",
-        stl_file_url: `https://example.com/generated-stl-files/${order_id}-${model_type}.stl`,
+        stl_file_url: `${protocol}://${baseUrl}/api/download-stl/${order_id}-${model_type}-${timestamp}.stl`,
         processing_time: "2.1s",
         file_size: "1.2MB"
       };
+      
+      console.log(`🔗 Generated STL URL: ${response.stl_file_url}`);
       
       console.log(`✅ STL generation completed for order: ${order_id}`);
       res.json(response);
@@ -592,6 +609,36 @@ export async function registerRoutes(app: Express): Promise<void> {
     } catch (error: any) {
       console.error("Error triggering STL generation:", error);
       res.status(500).json({ message: "Error triggering STL generation: " + error.message });
+    }
+  });
+
+  // STL File Download endpoint (mock)
+  app.get("/api/download-stl/:filename", async (req, res) => {
+    try {
+      const { filename } = req.params;
+      console.log(`📥 STL download requested: ${filename}`);
+      
+      // In production, this would stream the actual STL file from storage
+      // For demo purposes, we'll create a mock STL file content
+      const mockSTLContent = `solid FormilyCraft
+        facet normal 0 0 1
+          outer loop
+            vertex 0 0 0
+            vertex 1 0 0
+            vertex 0.5 1 0
+          endloop
+        endfacet
+      endsolid FormilyCraft`;
+      
+      res.setHeader('Content-Type', 'application/octet-stream');
+      res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      res.setHeader('Content-Length', Buffer.byteLength(mockSTLContent));
+      
+      console.log(`✅ Serving mock STL file: ${filename}`);
+      res.send(mockSTLContent);
+    } catch (error: any) {
+      console.error(`❌ Error serving STL file:`, error);
+      res.status(500).json({ message: "Error downloading STL file: " + error.message });
     }
   });
 
