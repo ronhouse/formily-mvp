@@ -56,3 +56,12 @@ Result: Agent generated SQL to drop and rebuild the table. Schema now matches ap
 - Added frontend payment button and post-payment confirmation route
 - Stripe redirect and return flow tested successfully with test card
 - Supabase order status properly updated to `paid` on success
+
+## Stripe Integration Fix Prompt
+> Fix domain routing issue where checkout redirect points to localhost. Replit autoscale server is deployed, need HTTPS-compatible success and cancel URLs with dynamic detection.
+
+## Webhook & STL Gen Prompt
+> After payment, send order to a mock STL generation endpoint. Update Supabase with a file URL and status. Add real-time polling and manual retry fallback in the confirmation screen.
+
+## Deployment Fix Prompt
+> Replit build fails due to ports and static path issues. Fix `serveStatic` directory mismatch and ensure express listens on 0.0.0.0:5000 in production.

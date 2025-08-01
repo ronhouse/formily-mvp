@@ -37,3 +37,23 @@ Next:
 - ✅ Verified full end-to-end test with successful payment flow
 - 🛠️ Noted temporary error on first attempt (invalid return URL), now resolved
 - 🔜 Phase 3 kickoff pending (mock webhook to printer service)
+
+## ✅ MVP Phase 3: Payment → Webhook → STL Download Flow (Completed 2025-08-01)
+
+- Integrated Stripe checkout with test card support
+- Configured success and cancel URLs using dynamic base URL detection
+- Set up Supabase to log and update order status after payment
+- Implemented webhook to simulate STL generation after payment confirmation
+- Added real-time polling to confirmation screen to show when STL is ready
+- Added fallback "Retry STL Generation" button for resilience
+- Download button now delivers STL file from Supabase mock URL
+- Fully deployed to Replit (autoscale, port fix, static build config corrected)
+- Fixed domain issues to eliminate “Hmm... We couldn’t reach this app” error
+- Confirmed entire end-to-end flow working in production
+
+Example Order:
+- Order ID: FM-057D3ECC
+- Status: Ready
+- File URL: [Mock STL File]
+
+Next Phase: Real STL generation integration
