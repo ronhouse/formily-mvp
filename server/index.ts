@@ -97,13 +97,8 @@ app.use((req, res, next) => {
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || '5000', 10);
-  
-  server.listen({
-    port,
-    host: "0.0.0.0",
-    reusePort: true,
-  }, () => {
-    log(`serving on port ${port} in ${process.env.NODE_ENV || 'development'} mode`);
+  app.listen(port, '0.0.0.0', () => {
+    console.log("Server running...");
     
     // Additional production startup logging
     if (process.env.NODE_ENV === 'production') {
@@ -116,17 +111,11 @@ app.use((req, res, next) => {
   // Graceful shutdown handling
   process.on('SIGTERM', () => {
     console.log('SIGTERM received, shutting down gracefully');
-    server.close(() => {
-      console.log('Process terminated');
-      process.exit(0);
-    });
+    process.exit(0);
   });
 
   process.on('SIGINT', () => {
     console.log('SIGINT received, shutting down gracefully');
-    server.close(() => {
-      console.log('Process terminated');
-      process.exit(0);
-    });
+    process.exit(0);
   });
 })();

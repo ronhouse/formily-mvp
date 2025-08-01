@@ -1,0 +1,20 @@
+{
+  "include": ["server/**/*", "shared/**/*"],
+  "exclude": ["node_modules", "**/*.test.ts", "client/**/*"],
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "outDir": "./dist",
+    "rootDir": "./",
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "declaration": false,
+    "sourceMap": false,
+    "removeComments": true,
+    "types": ["node"],
+    "lib": ["ES2022"]
+  }
+}
