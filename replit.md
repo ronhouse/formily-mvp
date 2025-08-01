@@ -198,5 +198,7 @@ Preferred communication style: Simple, everyday language.
 - ✅ **Added Hero Process Banner**: Photo-to-3D transformation visualization for homepage
 - ✅ **Updated Landing Page Gallery**: Replaced stock photos with authentic 3D printing examples
 - ✅ **Enhanced Style Selector**: Product cards now display realistic custom-generated images
-- ✅ **Fixed Deployment Asset Loading**: Copied images to client/public/ for proper deployment inclusion
-- ✅ **Updated Build Process**: Images now correctly included in dist/public/assets/ during build
+- ✅ **Fixed Deployment Asset Loading**: Moved images to client/src/assets/ for proper Vite bundling
+- ✅ **Updated Build Process**: Images now correctly bundled with hash-based filenames for cache busting
+- ✅ **Added Version Indicator**: Added "v2.0 - Vision Roadmap Updates" text to verify deployment version
+- ✅ **Deployment Cache Issue Identified**: Local build contains all Vision Roadmap updates, but deployment may be serving cached version
