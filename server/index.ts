@@ -37,14 +37,39 @@ app.use((req, res, next) => {
 });
 
 (async () => {
+  // Health check endpoint for deployment monitoring
+  app.get('/health', (_req, res) => {
+    res.status(200).json({ 
+      status: 'ok', 
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      memory: process.memoryUsage(),
+      env: process.env.NODE_ENV || 'development'
+    });
+  });
+
   const server = await registerRoutes(app);
 
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
+    
+    // Log errors in production for debugging
+    if (process.env.NODE_ENV === 'production') {
+      console.error(`[ERROR] ${status} - ${message}`, {
+        stack: err.stack,
+        url: _req.url,
+        method: _req.method,
+        timestamp: new Date().toISOString()
+      });
+    }
 
     res.status(status).json({ message });
-    throw err;
+    
+    // Don't throw in production to prevent crashes
+    if (process.env.NODE_ENV !== 'production') {
+      throw err;
+    }
   });
 
   // importantly only setup vite in development and after
@@ -56,16 +81,52 @@ app.use((req, res, next) => {
     serveStatic(app);
   }
 
+  // Validate required environment variables in production
+  if (process.env.NODE_ENV === 'production') {
+    const requiredEnvVars = ['DATABASE_URL', 'STRIPE_SECRET_KEY'];
+    const missingVars = requiredEnvVars.filter(varName => !process.env[varName]);
+    
+    if (missingVars.length > 0) {
+      console.error('Missing required environment variables:', missingVars);
+      process.exit(1);
+    }
+  }
+
   // ALWAYS serve the app on the port specified in the environment variable PORT
   // Other ports are firewalled. Default to 5000 if not specified.
   // this serves both the API and the client.
   // It is the only port that is not firewalled.
   const port = parseInt(process.env.PORT || '5000', 10);
+  
   server.listen({
     port,
     host: "0.0.0.0",
     reusePort: true,
   }, () => {
-    log(`serving on port ${port}`);
+    log(`serving on port ${port} in ${process.env.NODE_ENV || 'development'} mode`);
+    
+    // Additional production startup logging
+    if (process.env.NODE_ENV === 'production') {
+      console.log('✅ Production server started successfully');
+      console.log(`🌐 Health check available at: /health`);
+      console.log(`📡 API endpoints available at: /api/*`);
+    }
+  });
+
+  // Graceful shutdown handling
+  process.on('SIGTERM', () => {
+    console.log('SIGTERM received, shutting down gracefully');
+    server.close(() => {
+      console.log('Process terminated');
+      process.exit(0);
+    });
+  });
+
+  process.on('SIGINT', () => {
+    console.log('SIGINT received, shutting down gracefully');
+    server.close(() => {
+      console.log('Process terminated');
+      process.exit(0);
+    });
   });
 })();
