@@ -198,7 +198,7 @@ const OrderConfirmationModal = ({ isOpen, order, onClose }: OrderConfirmationMod
         </div>
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Order Confirmed!</h2>
         <p className="text-gray-600 mb-6">
-          Your custom 3D model is being generated. You'll receive your STL file and tracking information via email within 24 hours.
+          Your custom 3D model is ready! Download your STL file below and start 3D printing.
         </p>
         
         <div className="bg-gray-50 rounded-xl p-4 mb-6 text-left">
@@ -217,6 +217,24 @@ const OrderConfirmationModal = ({ isOpen, order, onClose }: OrderConfirmationMod
             </div>
           </div>
         </div>
+
+        {/* STL Download Section */}
+        {order.stlFileUrl && (
+          <div className="bg-primary/10 border border-primary/20 rounded-xl p-4 mb-6">
+            <h3 className="font-semibold text-primary mb-2">Your 3D Model is Ready!</h3>
+            <p className="text-sm text-gray-600 mb-4">Click below to download your STL file for 3D printing.</p>
+            <a 
+              href={order.stlFileUrl} 
+              download={`formily-${order.style}-${order.id.slice(-8)}.stl`}
+              className="inline-flex items-center justify-center w-full bg-primary text-white py-2 px-4 rounded-lg hover:bg-primary/90 transition-colors"
+            >
+              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              Download STL File
+            </a>
+          </div>
+        )}
 
         <div className="flex space-x-3">
           <Link href="/orders" className="flex-1">

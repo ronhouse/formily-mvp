@@ -154,7 +154,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const supabase = createClient(supabaseUrl, supabaseKey);
       console.log('🔗 Supabase client initialized successfully');
       
-      // Prepare complete Supabase insert payload with all application fields
+      // Prepare complete Supabase insert payload with all application fields including mock STL
       const supabasePayload = {
         user_id: orderData.userId,
         status: 'pending',
@@ -166,7 +166,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         quality: orderData.quality || 'standard',
         total_amount: orderData.totalAmount,
         stripe_payment_intent_id: orderData.stripePaymentIntentId || null,
-        stl_file_url: orderData.stlFileUrl || null,
+        stl_file_url: 'https://example.com/fake-download.stl', // Mock STL file URL
         specifications: orderData.specifications || null
       };
       

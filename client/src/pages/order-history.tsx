@@ -181,11 +181,16 @@ export default function OrderHistory() {
                       </div>
                       
                       <div className="space-y-2">
-                        {order.status === 'completed' && order.stlFileUrl && (
-                          <Button className="w-full" size="sm">
-                            <Download className="w-4 h-4 mr-2" />
-                            Download STL
-                          </Button>
+                        {order.stl_file_url && (
+                          <a 
+                            href={order.stl_file_url} 
+                            download={`formily-${order.model_type}-${order.id.slice(-8)}.stl`}
+                          >
+                            <Button className="w-full" size="sm">
+                              <Download className="w-4 h-4 mr-2" />
+                              Download STL
+                            </Button>
+                          </a>
                         )}
                         
                         <Button variant="outline" className="w-full" size="sm">
