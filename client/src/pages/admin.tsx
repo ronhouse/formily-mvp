@@ -3,7 +3,18 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { Download, Printer, RefreshCw, AlertCircle } from 'lucide-react';
+import { 
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import { Download, Printer, RefreshCw, AlertCircle, RotateCcw, XCircle, CheckCircle } from 'lucide-react';
 
 interface Order {
   id: string;
@@ -50,6 +61,8 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [dispatchingOrders, setDispatchingOrders] = useState<Set<string>>(new Set());
+  const [regeneratingOrders, setRegeneratingOrders] = useState<Set<string>>(new Set());
+  const [updatingOrders, setUpdatingOrders] = useState<Set<string>>(new Set());
   const { toast } = useToast();
 
   const fetchOrders = async () => {
@@ -114,6 +127,162 @@ export default function AdminPage() {
       });
     } finally {
       setDispatchingOrders(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(orderId);
+        return newSet;
+      });
+    }
+  };
+
+  const handleRegenerateSTL = async (orderId: string) => {
+    setRegeneratingOrders(prev => new Set(prev).add(orderId));
+    
+    // Optimistically update UI
+    setOrders(prev => prev.map(order => 
+      order.id === orderId 
+        ? { ...order, status: 'processing' }
+        : order
+    ));
+    
+    try {
+      const response = await fetch(`/api/generate-stl/${orderId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast({
+          title: "STL Regenerated",
+          description: `New STL file generated for order ${orderId}`,
+        });
+        
+        // Update the order with new STL data
+        setOrders(prev => prev.map(order => 
+          order.id === orderId 
+            ? { 
+                ...order, 
+                status: 'completed',
+                stl_file_url: data.stlFileUrl 
+              }
+            : order
+        ));
+      } else {
+        throw new Error(data.message || 'Failed to regenerate STL');
+      }
+    } catch (err: any) {
+      console.error('Error regenerating STL:', err);
+      toast({
+        title: "Regeneration Failed",
+        description: err.message,
+        variant: "destructive",
+      });
+      
+      // Revert optimistic update
+      setOrders(prev => prev.map(order => 
+        order.id === orderId 
+          ? { ...order, status: 'failed' }
+          : order
+      ));
+    } finally {
+      setRegeneratingOrders(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(orderId);
+        return newSet;
+      });
+    }
+  };
+
+  const handleMarkAsFailed = async (orderId: string) => {
+    setUpdatingOrders(prev => new Set(prev).add(orderId));
+    
+    // Optimistically update UI
+    setOrders(prev => prev.map(order => 
+      order.id === orderId 
+        ? { ...order, status: 'failed', stl_file_url: null }
+        : order
+    ));
+    
+    try {
+      const response = await fetch(`/api/orders/${orderId}/fail`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast({
+          title: "Order Failed",
+          description: `Order ${orderId} marked as failed`,
+        });
+      } else {
+        throw new Error(data.message || 'Failed to mark order as failed');
+      }
+    } catch (err: any) {
+      console.error('Error marking order as failed:', err);
+      toast({
+        title: "Update Failed",
+        description: err.message,
+        variant: "destructive",
+      });
+      
+      // Revert optimistic update - refetch to get current state
+      fetchOrders();
+    } finally {
+      setUpdatingOrders(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(orderId);
+        return newSet;
+      });
+    }
+  };
+
+  const handleForceComplete = async (orderId: string) => {
+    setUpdatingOrders(prev => new Set(prev).add(orderId));
+    
+    // Optimistically update UI
+    setOrders(prev => prev.map(order => 
+      order.id === orderId 
+        ? { ...order, status: 'completed' }
+        : order
+    ));
+    
+    try {
+      const response = await fetch(`/api/orders/${orderId}/complete`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast({
+          title: "Order Completed",
+          description: `Order ${orderId} force completed`,
+        });
+      } else {
+        throw new Error(data.message || 'Failed to force complete order');
+      }
+    } catch (err: any) {
+      console.error('Error force completing order:', err);
+      toast({
+        title: "Update Failed",
+        description: err.message,
+        variant: "destructive",
+      });
+      
+      // Revert optimistic update - refetch to get current state
+      fetchOrders();
+    } finally {
+      setUpdatingOrders(prev => {
         const newSet = new Set(prev);
         newSet.delete(orderId);
         return newSet;
@@ -231,7 +400,7 @@ export default function AdminPage() {
                     <th className="text-left p-3 font-semibold">Status</th>
                     <th className="text-left p-3 font-semibold">Amount</th>
                     <th className="text-left p-3 font-semibold">STL File</th>
-                    <th className="text-left p-3 font-semibold">Dispatch</th>
+                    <th className="text-left p-3 font-semibold">Admin Actions</th>
                     <th className="text-left p-3 font-semibold">Created</th>
                   </tr>
                 </thead>
@@ -291,31 +460,139 @@ export default function AdminPage() {
                         )}
                       </td>
                       <td className="p-3">
-                        {order.status === 'completed' && 
-                         order.stl_file_url && 
-                         !order.print_dispatched ? (
-                          <Button
-                            size="sm"
-                            onClick={() => handleSendToPrinter(order.id)}
-                            disabled={dispatchingOrders.has(order.id)}
-                            className="bg-blue-600 hover:bg-blue-700"
-                          >
-                            {dispatchingOrders.has(order.id) ? (
-                              <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
-                            ) : (
-                              <Printer className="h-3 w-3 mr-1" />
-                            )}
-                            {dispatchingOrders.has(order.id) ? 'Sending...' : 'Send to Printer'}
-                          </Button>
-                        ) : order.print_dispatched ? (
-                          <Badge variant="secondary">
-                            Dispatched
-                          </Badge>
-                        ) : (
-                          <span className="text-muted-foreground text-sm">
-                            {order.status !== 'completed' ? 'Pending completion' : 'No STL file'}
-                          </span>
-                        )}
+                        <div className="flex flex-wrap gap-1">
+                          {/* Send to Printer Button */}
+                          {order.status === 'completed' && 
+                           order.stl_file_url && 
+                           !order.print_dispatched && (
+                            <Button
+                              size="sm"
+                              onClick={() => handleSendToPrinter(order.id)}
+                              disabled={dispatchingOrders.has(order.id)}
+                              className="bg-blue-600 hover:bg-blue-700 text-xs px-2 py-1"
+                            >
+                              {dispatchingOrders.has(order.id) ? (
+                                <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
+                              ) : (
+                                <Printer className="h-3 w-3 mr-1" />
+                              )}
+                              {dispatchingOrders.has(order.id) ? 'Sending...' : 'Print'}
+                            </Button>
+                          )}
+
+                          {/* Print Dispatched Badge */}
+                          {order.print_dispatched && (
+                            <Badge variant="secondary" className="text-xs">
+                              Dispatched
+                            </Badge>
+                          )}
+
+                          {/* Regenerate STL Button */}
+                          {(order.status === 'completed' || order.status === 'failed') && (
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={regeneratingOrders.has(order.id)}
+                                  className="text-xs px-2 py-1"
+                                >
+                                  {regeneratingOrders.has(order.id) ? (
+                                    <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
+                                  ) : (
+                                    <RotateCcw className="h-3 w-3 mr-1" />
+                                  )}
+                                  {regeneratingOrders.has(order.id) ? 'Regenerating...' : 'Regenerate'}
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Regenerate STL File</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This will reprocess the image and generate a new STL file for order {order.id.substring(0, 8)}...
+                                    The existing STL file will be replaced.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => handleRegenerateSTL(order.id)}>
+                                    Regenerate STL
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          )}
+
+                          {/* Mark as Failed Button */}
+                          {order.status !== 'failed' && (
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={updatingOrders.has(order.id)}
+                                  className="text-xs px-2 py-1 text-red-600 border-red-200 hover:bg-red-50"
+                                >
+                                  <XCircle className="h-3 w-3 mr-1" />
+                                  Fail
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Mark Order as Failed</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This will mark order {order.id.substring(0, 8)}... as failed and remove any STL file.
+                                    This action cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction 
+                                    onClick={() => handleMarkAsFailed(order.id)}
+                                    className="bg-red-600 hover:bg-red-700"
+                                  >
+                                    Mark as Failed
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          )}
+
+                          {/* Force Complete Button */}
+                          {order.status !== 'completed' && (
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  disabled={updatingOrders.has(order.id)}
+                                  className="text-xs px-2 py-1 text-green-600 border-green-200 hover:bg-green-50"
+                                >
+                                  <CheckCircle className="h-3 w-3 mr-1" />
+                                  Complete
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Force Complete Order</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This will manually mark order {order.id.substring(0, 8)}... as completed.
+                                    Use this only if the order should be considered complete.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction 
+                                    onClick={() => handleForceComplete(order.id)}
+                                    className="bg-green-600 hover:bg-green-700"
+                                  >
+                                    Force Complete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          )}
+                        </div>
                       </td>
                       <td className="p-3">
                         <span className="text-sm text-muted-foreground">

@@ -687,6 +687,89 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
+  // Admin endpoint: Mark order as failed
+  app.patch("/api/orders/:orderId/fail", async (req, res) => {
+    try {
+      const { orderId } = req.params;
+      
+      if (!orderId) {
+        return res.status(400).json({ message: "Order ID is required" });
+      }
+      
+      console.log(`❌ Admin action: Marking order ${orderId} as failed`);
+      
+      const { getOrderFromSupabase, updateOrderInSupabase } = await import('./supabase-helper');
+      const order = await getOrderFromSupabase(orderId);
+      
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+      
+      // Update order status to failed and optionally remove STL file URL
+      await updateOrderInSupabase(orderId, {
+        status: 'failed',
+        stl_file_url: null // Remove STL file URL when marking as failed
+      });
+      
+      console.log(`✅ Order ${orderId} marked as failed`);
+      
+      res.json({
+        success: true,
+        message: "Order marked as failed",
+        orderId: orderId
+      });
+      
+    } catch (error: any) {
+      console.error(`❌ Failed to mark order ${req.params.orderId} as failed:`, error);
+      res.status(500).json({ 
+        success: false,
+        message: "Failed to mark order as failed", 
+        error: error.message
+      });
+    }
+  });
+
+  // Admin endpoint: Force complete order
+  app.patch("/api/orders/:orderId/complete", async (req, res) => {
+    try {
+      const { orderId } = req.params;
+      
+      if (!orderId) {
+        return res.status(400).json({ message: "Order ID is required" });
+      }
+      
+      console.log(`✅ Admin action: Force completing order ${orderId}`);
+      
+      const { getOrderFromSupabase, updateOrderInSupabase } = await import('./supabase-helper');
+      const order = await getOrderFromSupabase(orderId);
+      
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+      
+      // Force update order status to completed
+      await updateOrderInSupabase(orderId, {
+        status: 'completed'
+      });
+      
+      console.log(`✅ Order ${orderId} force completed`);
+      
+      res.json({
+        success: true,
+        message: "Order force completed",
+        orderId: orderId
+      });
+      
+    } catch (error: any) {
+      console.error(`❌ Failed to force complete order ${req.params.orderId}:`, error);
+      res.status(500).json({ 
+        success: false,
+        message: "Failed to force complete order", 
+        error: error.message
+      });
+    }
+  });
+
   // Mock STL generation endpoint (legacy)
   app.post("/api/generate-stl", async (req, res) => {
     try {
