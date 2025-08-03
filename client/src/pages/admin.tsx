@@ -14,7 +14,9 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { Download, Printer, RefreshCw, AlertCircle, RotateCcw, XCircle, CheckCircle } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Download, Printer, RefreshCw, AlertCircle, RotateCcw, XCircle, CheckCircle, Trash2, Settings } from 'lucide-react';
 
 interface Order {
   id: string;
@@ -63,6 +65,8 @@ export default function AdminPage() {
   const [dispatchingOrders, setDispatchingOrders] = useState<Set<string>>(new Set());
   const [regeneratingOrders, setRegeneratingOrders] = useState<Set<string>>(new Set());
   const [updatingOrders, setUpdatingOrders] = useState<Set<string>>(new Set());
+  const [autoDispatch, setAutoDispatch] = useState(false);
+  const [cleanupInProgress, setCleanupInProgress] = useState(false);
   const { toast } = useToast();
 
   const fetchOrders = async () => {
@@ -318,8 +322,88 @@ export default function AdminPage() {
     }
   };
 
+  const handleCleanupSTL = async () => {
+    setCleanupInProgress(true);
+    
+    try {
+      const response = await fetch('/api/cleanup-stl', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast({
+          title: "Cleanup Complete",
+          description: `Cleaned up ${data.deletedCount} old STL files`,
+        });
+      } else {
+        throw new Error(data.message || 'Failed to cleanup STL files');
+      }
+    } catch (err: any) {
+      console.error('Error cleaning up STL files:', err);
+      toast({
+        title: "Cleanup Failed",
+        description: err.message,
+        variant: "destructive",
+      });
+    } finally {
+      setCleanupInProgress(false);
+    }
+  };
+
+  const handleAutoDispatchToggle = async (enabled: boolean) => {
+    setAutoDispatch(enabled);
+    
+    try {
+      const response = await fetch('/api/admin/auto-dispatch', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ enabled }),
+      });
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast({
+          title: enabled ? "Auto Dispatch Enabled" : "Auto Dispatch Disabled",
+          description: enabled 
+            ? "New completed orders will be automatically dispatched" 
+            : "Auto dispatch has been turned off",
+        });
+      } else {
+        // Revert toggle on failure
+        setAutoDispatch(!enabled);
+        throw new Error(data.message || 'Failed to update auto dispatch setting');
+      }
+    } catch (err: any) {
+      console.error('Error updating auto dispatch:', err);
+      setAutoDispatch(!enabled); // Revert toggle
+      toast({
+        title: "Update Failed",
+        description: err.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   useEffect(() => {
     fetchOrders();
+    
+    // Fetch current auto dispatch setting
+    fetch('/api/admin/auto-dispatch')
+      .then(res => res.json())
+      .then(data => {
+        if (data.success) {
+          setAutoDispatch(data.enabled);
+        }
+      })
+      .catch(err => console.error('Error fetching auto dispatch setting:', err));
   }, []);
 
   if (loading) {
@@ -368,10 +452,34 @@ export default function AdminPage() {
             Manage orders, STL files, and printer dispatch
           </p>
         </div>
-        <Button onClick={fetchOrders} variant="outline">
-          <RefreshCw className="h-4 w-4 mr-2" />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center space-x-2">
+            <Switch
+              id="auto-dispatch"
+              checked={autoDispatch}
+              onCheckedChange={handleAutoDispatchToggle}
+            />
+            <Label htmlFor="auto-dispatch" className="text-sm font-medium">
+              Auto Dispatch
+            </Label>
+          </div>
+          <Button 
+            onClick={handleCleanupSTL} 
+            variant="outline"
+            disabled={cleanupInProgress}
+          >
+            {cleanupInProgress ? (
+              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Trash2 className="h-4 w-4 mr-2" />
+            )}
+            {cleanupInProgress ? 'Cleaning...' : 'Cleanup STL'}
+          </Button>
+          <Button onClick={fetchOrders} variant="outline">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {orders.length === 0 ? (

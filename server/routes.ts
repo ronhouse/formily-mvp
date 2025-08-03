@@ -659,6 +659,16 @@ export async function registerRoutes(app: Express): Promise<void> {
       
       console.log(`✅ Order ${orderId} completed with STL file`);
       
+      // Check if auto dispatch is enabled and trigger dispatch
+      if (autoDispatchEnabled) {
+        console.log(`🚀 Auto dispatch enabled - triggering dispatch for order ${orderId}`);
+        try {
+          await triggerAutoDispatch(orderId);
+        } catch (dispatchError) {
+          console.error(`❌ Auto dispatch failed for order ${orderId}:`, dispatchError);
+        }
+      }
+      
       res.json({
         success: true,
         message: "STL generation completed successfully",
@@ -754,6 +764,16 @@ export async function registerRoutes(app: Express): Promise<void> {
       
       console.log(`✅ Order ${orderId} force completed`);
       
+      // Check if auto dispatch is enabled and trigger dispatch
+      if (autoDispatchEnabled && order.stl_file_url && !order.print_dispatched) {
+        console.log(`🚀 Auto dispatch enabled - triggering dispatch for order ${orderId}`);
+        try {
+          await triggerAutoDispatch(orderId);
+        } catch (dispatchError) {
+          console.error(`❌ Auto dispatch failed for order ${orderId}:`, dispatchError);
+        }
+      }
+      
       res.json({
         success: true,
         message: "Order force completed",
@@ -766,6 +786,163 @@ export async function registerRoutes(app: Express): Promise<void> {
         success: false,
         message: "Failed to force complete order", 
         error: error.message
+      });
+    }
+  });
+
+  // Auto dispatch configuration (runtime flag)
+  let autoDispatchEnabled = false;
+
+  // Helper function for auto dispatch
+  async function triggerAutoDispatch(orderId: string) {
+    try {
+      const { getOrderFromSupabase, updateOrderInSupabase } = await import('./supabase-helper');
+      const order = await getOrderFromSupabase(orderId);
+      
+      if (!order || !order.stl_file_url || order.print_dispatched) {
+        return;
+      }
+
+      console.log(`🚀 Auto dispatching order ${orderId} to print partner`);
+
+      // Dispatch to print partner (reuse existing logic)
+      const dispatchPayload = {
+        orderId: order.id,
+        productType: order.model_type,
+        customerEmail: order.user_id.includes('@') ? order.user_id : `${order.user_id}@anonymous.formily.com`,
+        stlUrl: order.stl_file_url
+      };
+
+      const webhookUrl = 'https://webhook.site/unique-endpoint-fake-printer-partner';
+      const webhookResponse = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(dispatchPayload),
+      });
+
+      if (webhookResponse.ok) {
+        // Mark as dispatched
+        await updateOrderInSupabase(orderId, { print_dispatched: true });
+        
+        // Send confirmation email
+        const { sendOrderConfirmationEmail } = await import('./email-service');
+        await sendOrderConfirmationEmail({
+          customerEmail: dispatchPayload.customerEmail,
+          orderId: order.id,
+          productType: order.model_type,
+          stlFileUrl: order.stl_file_url,
+          engravingText: order.engraving_text
+        });
+        
+        console.log(`✅ Auto dispatch successful for order ${orderId}`);
+      } else {
+        throw new Error(`Webhook failed with status ${webhookResponse.status}`);
+      }
+    } catch (error: any) {
+      console.error(`❌ Auto dispatch failed for order ${orderId}:`, error);
+      throw error;
+    }
+  }
+
+  // Admin endpoints for auto dispatch management
+  app.get("/api/admin/auto-dispatch", (req, res) => {
+    res.json({
+      success: true,
+      enabled: autoDispatchEnabled
+    });
+  });
+
+  app.post("/api/admin/auto-dispatch", (req, res) => {
+    try {
+      const { enabled } = req.body;
+      
+      if (typeof enabled !== 'boolean') {
+        return res.status(400).json({ 
+          success: false, 
+          message: "enabled must be a boolean" 
+        });
+      }
+      
+      autoDispatchEnabled = enabled;
+      console.log(`⚙️ Auto dispatch ${enabled ? 'enabled' : 'disabled'}`);
+      
+      res.json({
+        success: true,
+        enabled: autoDispatchEnabled,
+        message: `Auto dispatch ${enabled ? 'enabled' : 'disabled'}`
+      });
+    } catch (error: any) {
+      res.status(500).json({ 
+        success: false, 
+        message: "Failed to update auto dispatch setting", 
+        error: error.message 
+      });
+    }
+  });
+
+  // STL Cleanup endpoint
+  app.post("/api/cleanup-stl", async (req, res) => {
+    try {
+      console.log('🧹 Starting STL cleanup process...');
+      
+      const { getSupabaseClient } = await import('./supabase-helper');
+      const supabase = getSupabaseClient();
+      
+      // Calculate date 14 days ago
+      const fourteenDaysAgo = new Date();
+      fourteenDaysAgo.setDate(fourteenDaysAgo.getDate() - 14);
+      
+      // Find orders with STL files that are older than 14 days and either failed or not dispatched
+      const { data: ordersToClean, error } = await supabase
+        .from('orders')
+        .select('id, stl_file_url, status, print_dispatched, created_at')
+        .not('stl_file_url', 'is', null)
+        .or(`status.eq.failed,print_dispatched.eq.false`)
+        .lt('created_at', fourteenDaysAgo.toISOString());
+      
+      if (error) {
+        throw new Error(`Database query failed: ${error.message}`);
+      }
+      
+      const cleanupCount = ordersToClean?.length || 0;
+      
+      if (cleanupCount === 0) {
+        console.log('✅ No STL files need cleanup');
+        return res.json({
+          success: true,
+          deletedCount: 0,
+          message: "No STL files needed cleanup"
+        });
+      }
+      
+      // Update orders to remove STL file URLs
+      const orderIds = ordersToClean.map(order => order.id);
+      const { error: updateError } = await supabase
+        .from('orders')
+        .update({ stl_file_url: null })
+        .in('id', orderIds);
+      
+      if (updateError) {
+        throw new Error(`Failed to update orders: ${updateError.message}`);
+      }
+      
+      console.log(`✅ Cleaned up ${cleanupCount} STL file references`);
+      
+      // Note: In a real implementation, you would also delete the actual files from storage
+      // For this demo, we're just removing the database references
+      
+      res.json({
+        success: true,
+        deletedCount: cleanupCount,
+        message: `Successfully cleaned up ${cleanupCount} old STL files`
+      });
+      
+    } catch (error: any) {
+      console.error('❌ STL cleanup failed:', error);
+      res.status(500).json({ 
+        success: false,
+        message: "STL cleanup failed", 
+        error: error.message 
       });
     }
   });
@@ -1024,6 +1201,22 @@ export async function registerRoutes(app: Express): Promise<void> {
         console.log(`✅ Order ${orderId} successfully dispatched to print partner`);
         
         console.log(`✅ Order ${orderId} marked as dispatched`);
+        
+        // Send order confirmation email
+        const { sendOrderConfirmationEmail } = await import('./email-service');
+        const emailSent = await sendOrderConfirmationEmail({
+          customerEmail: customerEmail,
+          orderId: order.id,
+          productType: order.model_type,
+          stlFileUrl: order.stl_file_url,
+          engravingText: order.engraving_text
+        });
+        
+        if (emailSent) {
+          console.log(`📧 Order confirmation email sent for order ${orderId}`);
+        } else {
+          console.warn(`⚠️ Failed to send order confirmation email for order ${orderId}`);
+        }
         
         res.json({
           success: true,
