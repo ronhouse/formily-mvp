@@ -10,10 +10,96 @@ import { z } from "zod";
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY || 'sk_test_placeholder_replace_with_real_stripe_secret_key';
 
 const stripe = new Stripe(stripeSecretKey, {
-  apiVersion: "2024-06-20",
+  apiVersion: "2025-07-30.basil",
 });
 
-// Mock STL generation webhook function
+// Mock STL generation service (simulating Replicate or similar AI service)
+async function mockSTLGenerationService(params: {
+  orderId: string;
+  imageUrl: string;
+  modelType: string;
+  engravingText?: string;
+  fontStyle?: string;
+  color?: string;
+  quality?: string;
+  specifications?: any;
+}) {
+  console.log(`🤖 Starting mock STL generation service...`);
+  console.log(`📋 Service parameters:`, JSON.stringify(params, null, 2));
+  
+  try {
+    // Simulate image processing and validation
+    console.log(`📷 Processing image from: ${params.imageUrl}`);
+    
+    // Simulate AI model processing time (like Replicate)
+    const processingTime = params.quality === 'high' ? 3000 : 1500;
+    console.log(`⏳ Simulating ${processingTime}ms processing time for ${params.quality} quality...`);
+    await new Promise(resolve => setTimeout(resolve, processingTime));
+    
+    // Generate mock STL file with proper naming and storage simulation
+    const baseUrl = process.env.REPLIT_DOMAINS || process.env.REPLIT_DEV_DOMAIN || 'localhost:5000';
+    const protocol = baseUrl.includes('localhost') ? 'http' : 'https';
+    const timestamp = Date.now();
+    const filename = `${params.orderId}-${params.modelType}-${timestamp}.stl`;
+    
+    // Simulate storing the STL file in object storage or file system
+    const stlFileUrl = `${protocol}://${baseUrl}/api/download-stl/${filename}`;
+    
+    // Simulate file size estimation based on quality and model type
+    const estimatedSize = calculateEstimatedFileSize(params.modelType, params.quality);
+    
+    console.log(`📦 Mock STL file generated:`);
+    console.log(`   - Filename: ${filename}`);
+    console.log(`   - URL: ${stlFileUrl}`);
+    console.log(`   - Estimated size: ${estimatedSize}MB`);
+    
+    // Create detailed response mimicking real STL generation service
+    const result = {
+      stlFileUrl,
+      details: {
+        filename,
+        estimatedSize,
+        modelType: params.modelType,
+        quality: params.quality || 'standard',
+        processingTime: processingTime,
+        features: {
+          hasEngraving: Boolean(params.engravingText),
+          engravingText: params.engravingText || null,
+          fontStyle: params.fontStyle || 'arial',
+          color: params.color || 'black'
+        },
+        metadata: {
+          generatedAt: new Date().toISOString(),
+          service: 'MockSTLGen v1.0',
+          orderId: params.orderId
+        }
+      }
+    };
+    
+    console.log(`✅ STL generation service completed successfully`);
+    return result;
+    
+  } catch (error: any) {
+    console.error(`❌ Mock STL generation service failed:`, error);
+    throw new Error(`STL generation failed: ${error.message}`);
+  }
+}
+
+// Helper function to estimate STL file size
+function calculateEstimatedFileSize(modelType: string, quality?: string): string {
+  const baseSize = {
+    'hunting_trophy': 2.5,
+    'pet_sculpture': 3.2,
+    '3d_keepsake': 1.8
+  };
+  
+  const qualityMultiplier = quality === 'high' ? 1.5 : 1.0;
+  const size = (baseSize[modelType as keyof typeof baseSize] || 2.0) * qualityMultiplier;
+  
+  return size.toFixed(1);
+}
+
+// Mock STL generation webhook function (legacy)
 async function triggerSTLGeneration(order: any) {
   try {
     console.log(`🎯 Sending STL generation request for order: ${order.id}`);
@@ -493,7 +579,89 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
-  // Mock STL generation endpoint
+  // STL Generation Endpoint - Accepts order ID, retrieves image, processes through STL service
+  app.post("/api/generate-stl/:orderId", async (req, res) => {
+    try {
+      const { orderId } = req.params;
+      
+      if (!orderId) {
+        return res.status(400).json({ message: "Order ID is required" });
+      }
+      
+      console.log(`🎯 Starting STL generation for order: ${orderId}`);
+      
+      // Retrieve order from Supabase
+      const { getOrderFromSupabase, updateOrderInSupabase } = await import('./supabase-helper');
+      const order = await getOrderFromSupabase(orderId);
+      
+      if (!order) {
+        console.error(`❌ Order not found: ${orderId}`);
+        return res.status(404).json({ message: "Order not found" });
+      }
+      
+      if (!order.image_url) {
+        console.error(`❌ No image URL found for order: ${orderId}`);
+        return res.status(400).json({ message: "Order has no image URL" });
+      }
+      
+      console.log(`📷 Retrieved order image URL: ${order.image_url}`);
+      console.log(`🎨 Order details - Model: ${order.model_type}, Text: ${order.engraving_text || 'none'}`);
+      
+      // Update order status to processing
+      await updateOrderInSupabase(orderId, { status: 'processing' });
+      console.log(`📝 Order status updated to 'processing'`);
+      
+      // Mock STL generation service call (simulating Replicate or similar service)
+      const stlResult = await mockSTLGenerationService({
+        orderId: order.id,
+        imageUrl: order.image_url,
+        modelType: order.model_type,
+        engravingText: order.engraving_text,
+        fontStyle: order.font_style,
+        color: order.color,
+        quality: order.quality,
+        specifications: order.specifications
+      });
+      
+      console.log(`🔗 STL generation completed, file URL: ${stlResult.stlFileUrl}`);
+      
+      // Update order with STL file URL and completion status
+      await updateOrderInSupabase(orderId, {
+        status: 'completed',
+        stl_file_url: stlResult.stlFileUrl
+      });
+      
+      console.log(`✅ Order ${orderId} completed with STL file`);
+      
+      res.json({
+        success: true,
+        message: "STL generation completed successfully",
+        orderId: orderId,
+        stlFileUrl: stlResult.stlFileUrl,
+        generationDetails: stlResult.details
+      });
+      
+    } catch (error: any) {
+      console.error(`❌ STL generation failed for order ${req.params.orderId}:`, error);
+      
+      // Update order status to failed
+      try {
+        const { updateOrderInSupabase } = await import('./supabase-helper');
+        await updateOrderInSupabase(req.params.orderId, { status: 'failed' });
+      } catch (updateError) {
+        console.error(`❌ Failed to update order status to failed:`, updateError);
+      }
+      
+      res.status(500).json({ 
+        success: false,
+        message: "STL generation failed", 
+        error: error.message,
+        orderId: req.params.orderId
+      });
+    }
+  });
+
+  // Mock STL generation endpoint (legacy)
   app.post("/api/generate-stl", async (req, res) => {
     try {
       const { orderId, userId } = req.body;
