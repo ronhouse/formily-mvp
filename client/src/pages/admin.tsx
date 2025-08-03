@@ -28,7 +28,7 @@ interface Order {
   quality?: string;
   total_amount: number;
   stripe_payment_intent_id?: string;
-  stl_file_url?: string;
+  stl_file_url?: string | null;
   print_dispatched?: boolean;
   specifications?: any;
   created_at: string;
