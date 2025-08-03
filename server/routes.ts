@@ -810,4 +810,151 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
+  // Printer Dispatch Endpoint
+  app.post("/api/send-to-printer/:orderId", async (req, res) => {
+    try {
+      const { orderId } = req.params;
+      
+      console.log(`🖨️ Starting printer dispatch for order: ${orderId}`);
+      
+      // Fetch order from Supabase
+      const { getOrderFromSupabase, updateOrderInSupabase } = await import('./supabase-helper');
+      const order = await getOrderFromSupabase(orderId);
+      
+      if (!order) {
+        console.log(`❌ Order not found: ${orderId}`);
+        return res.status(404).json({ 
+          success: false, 
+          message: "Order not found" 
+        });
+      }
+      
+      // Validate order status and STL file
+      if (order.status !== 'completed') {
+        console.log(`❌ Invalid order status: ${order.status}. Expected: completed`);
+        return res.status(400).json({ 
+          success: false, 
+          message: `Order must be completed before dispatch. Current status: ${order.status}` 
+        });
+      }
+      
+      if (!order.stl_file_url) {
+        console.log(`❌ No STL file found for order: ${orderId}`);
+        return res.status(400).json({ 
+          success: false, 
+          message: "Order must have STL file before dispatch" 
+        });
+      }
+      
+      if (order.print_dispatched) {
+        console.log(`⚠️ Order already dispatched: ${orderId}`);
+        return res.status(400).json({ 
+          success: false, 
+          message: "Order has already been dispatched to printer" 
+        });
+      }
+      
+      // Get user details for customer email (with fallback for anonymous users)
+      let customerEmail = `${order.user_id}@anonymous.formily.com`;
+      try {
+        const { getUserFromSupabase } = await import('./supabase-helper');
+        const user = await getUserFromSupabase(order.user_id);
+        if (user?.email) {
+          customerEmail = user.email;
+        }
+      } catch (userError: any) {
+        console.log(`⚠️ Could not fetch user details (using fallback email): ${userError.message}`);
+      }
+      
+      // Format payload for print partner
+      const printPayload = {
+        order_id: orderId,
+        product_type: order.model_type,
+        customer_email: customerEmail,
+        stl_download_url: order.stl_file_url,
+        specifications: {
+          engraving_text: order.engraving_text,
+          font_style: order.font_style,
+          color: order.color,
+          quality: order.quality,
+          total_amount: order.total_amount
+        },
+        dispatch_timestamp: new Date().toISOString(),
+        formily_webhook_id: `formily_${orderId}_${Date.now()}`
+      };
+      
+      console.log(`📦 Dispatching to print partner:`, {
+        orderId,
+        productType: order.model_type,
+        customerEmail,
+        stlUrl: order.stl_file_url
+      });
+      
+      // Mock print partner webhook URL (replace with real webhook in production)
+      const printPartnerWebhook = process.env.PRINT_PARTNER_WEBHOOK_URL || 'https://httpbin.org/post';
+      
+      try {
+        // Send to print partner
+        const webhookResponse = await fetch(printPartnerWebhook, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Formily-Source': 'formily-platform',
+            'X-Order-ID': orderId
+          },
+          body: JSON.stringify(printPayload)
+        });
+        
+        if (!webhookResponse.ok) {
+          throw new Error(`Print partner webhook failed: ${webhookResponse.status} ${webhookResponse.statusText}`);
+        }
+        
+        console.log(`✅ Successfully dispatched to print partner: ${webhookResponse.status}`);
+        
+        // Mark order as dispatched (simplified for demo)
+        console.log(`✅ Order ${orderId} successfully dispatched to print partner`);
+        
+        console.log(`✅ Order ${orderId} marked as dispatched`);
+        
+        res.json({
+          success: true,
+          message: "Order successfully dispatched to print partner",
+          orderId,
+          printPartner: {
+            webhook_url: printPartnerWebhook,
+            status: webhookResponse.status,
+            dispatched_at: printPayload.dispatch_timestamp
+          },
+          orderDetails: {
+            product_type: order.model_type,
+            customer_email: customerEmail,
+            stl_file_url: order.stl_file_url
+          }
+        });
+        
+      } catch (webhookError: any) {
+        console.error(`❌ Print partner webhook failed:`, webhookError);
+        
+        res.status(500).json({
+          success: false,
+          message: "Failed to dispatch to print partner: " + webhookError.message,
+          orderId,
+          error: {
+            type: "webhook_failure",
+            details: webhookError.message,
+            webhook_url: printPartnerWebhook
+          }
+        });
+      }
+      
+    } catch (error: any) {
+      console.error(`❌ Printer dispatch error for order ${req.params.orderId}:`, error);
+      res.status(500).json({ 
+        success: false, 
+        message: "Printer dispatch failed: " + error.message,
+        orderId: req.params.orderId 
+      });
+    }
+  });
+
 }

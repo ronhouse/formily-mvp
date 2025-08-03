@@ -54,3 +54,21 @@ export async function updateOrderInSupabase(orderId: string, updates: any) {
   
   return data;
 }
+
+// Helper to get user by ID from Supabase
+export async function getUserFromSupabase(userId: string) {
+  const supabase = getSupabaseClient();
+  
+  const { data, error } = await supabase
+    .from('users')
+    .select('*')
+    .eq('id', userId)
+    .single();
+    
+  if (error) {
+    console.error('❌ Supabase user fetch error:', error);
+    throw new Error(`Failed to fetch user: ${error.message}`);
+  }
+  
+  return data;
+}

@@ -23,6 +23,7 @@ export const orders = pgTable("orders", {
   totalAmount: decimal("total_amount", { precision: 10, scale: 2 }).notNull(),
   stripePaymentIntentId: text("stripe_payment_intent_id"),
   stlFileUrl: text("stl_file_url"),
+  printDispatched: boolean("print_dispatched").default(false).notNull(),
   specifications: jsonb("specifications"), // dimensions, material, etc.
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
