@@ -10,6 +10,7 @@ import Checkout from "@/pages/checkout";
 import OrderHistory from "@/pages/order-history";
 import Summary from "@/pages/summary";
 import Confirmation from "@/pages/confirmation";
+import Admin from "@/pages/admin";
 
 function Router() {
   return (
@@ -19,6 +20,7 @@ function Router() {
       <Route path="/orders" component={OrderHistory} />
       <Route path="/summary" component={Summary} />
       <Route path="/confirmation" component={Confirmation} />
+      <Route path="/admin" component={Admin} />
       <Route component={NotFound} />
     </Switch>
   );

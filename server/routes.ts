@@ -389,6 +389,32 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
+  // Get all orders (admin endpoint)
+  app.get("/api/orders", async (req, res) => {
+    try {
+      const { getSupabaseClient } = await import('./supabase-helper');
+      const supabase = getSupabaseClient();
+      
+      console.log('🔍 Fetching all orders for admin dashboard');
+      
+      const { data: orders, error } = await supabase
+        .from('orders')
+        .select('*')
+        .order('created_at', { ascending: false });
+        
+      if (error) {
+        console.error('❌ Error fetching all orders:', error);
+        throw new Error(error.message);
+      }
+      
+      console.log(`✅ Retrieved ${orders.length} orders for admin dashboard`);
+      res.json(orders);
+    } catch (error: any) {
+      console.error('❌ Error in admin orders endpoint:', error.message);
+      res.status(500).json({ message: "Error fetching orders: " + error.message });
+    }
+  });
+
   app.get("/api/orders/user/:userId", async (req, res) => {
     try {
       const { userId } = req.params;
