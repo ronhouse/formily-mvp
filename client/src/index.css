@@ -52,6 +52,19 @@
 }
 
 @layer base {
+  html {
+    scroll-behavior: auto !important;
+  }
+  
+  body {
+    overflow-x: hidden;
+  }
+  
+  /* Prevent unwanted focus-induced scrolling */
+  *:focus {
+    scroll-margin: 0;
+  }
+  
   * {
     @apply border-border;
   }

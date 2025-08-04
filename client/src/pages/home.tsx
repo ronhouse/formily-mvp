@@ -41,6 +41,23 @@ export default function Home() {
   const queryClient = useQueryClient();
   const { user: authUser, isLoading: authLoading, isSupabaseAuth } = useAuth();
 
+  // Ensure page starts at top and prevent unwanted scrolling
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
+  // Prevent automatic scrolling when step changes
+  useEffect(() => {
+    // Use setTimeout to let the DOM update first
+    const timer = setTimeout(() => {
+      if (currentStep > 1) {
+        window.scrollTo({ top: 0, behavior: 'instant' });
+      }
+    }, 50);
+
+    return () => clearTimeout(timer);
+  }, [currentStep]);
+
   // Get or create database user from auth user
   const { data: user } = useQuery({
     queryKey: ['/api/users', authUser?.id],
@@ -105,12 +122,22 @@ export default function Home() {
   const handleNextStep = () => {
     if (currentStep < 4 && canProceedToNextStep()) {
       setCurrentStep(currentStep + 1);
+      
+      // Prevent automatic scrolling when advancing to next step
+      setTimeout(() => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }, 100);
     }
   };
 
   const handlePreviousStep = () => {
     if (currentStep > 1) {
       setCurrentStep(currentStep - 1);
+      
+      // Prevent automatic scrolling when going back to previous step
+      setTimeout(() => {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }, 100);
     }
   };
 
@@ -159,6 +186,8 @@ export default function Home() {
               <FileUpload
                 onFileUploaded={(fileData) => {
                   setOrderData({ ...orderData, photoUrl: fileData.url });
+                  // Note: Do not automatically advance to next step after file upload
+                  // User should manually click "Continue" to proceed to step 2
                 }}
                 className="mb-8"
               />
@@ -204,6 +233,11 @@ export default function Home() {
               selectedStyle={orderData.style || ''}
               onStyleSelect={(styleId) => {
                 setOrderData({ ...orderData, style: styleId });
+                // Prevent any scrolling when a style is selected
+                setTimeout(() => {
+                  const currentScrollPos = window.scrollY;
+                  window.scrollTo(0, currentScrollPos);
+                }, 0);
               }}
             />
           </div>
