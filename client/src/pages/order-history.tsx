@@ -143,8 +143,8 @@ export default function OrderHistory() {
                       <CardTitle className="text-lg">Order #{order.id.slice(-8).toUpperCase()}</CardTitle>
                       <p className="text-sm text-gray-600">Placed on {formatDate(order.createdAt)}</p>
                     </div>
-                    <Badge className={getStatusColor(order.status)}>
-                      {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+                    <Badge className={getStatusColor(order.status || 'pending')}>
+                      {order.status ? (order.status.charAt(0).toUpperCase() + order.status.slice(1)) : 'Pending'}
                     </Badge>
                   </div>
                 </CardHeader>
@@ -162,7 +162,7 @@ export default function OrderHistory() {
                     {/* Order Details */}
                     <div className="md:col-span-1">
                       <h4 className="font-medium text-gray-900 mb-2">
-                        {order.style.charAt(0).toUpperCase() + order.style.slice(1)}
+                        {order.style ? (order.style.charAt(0).toUpperCase() + order.style.slice(1)) : 'Unknown Style'}
                       </h4>
                       {order.engravingText && (
                         <p className="text-sm text-gray-600 mb-1">
@@ -173,7 +173,7 @@ export default function OrderHistory() {
                         Quality: {order.quality === 'high' ? 'High' : 'Standard'}
                       </p>
                       <p className="text-sm text-gray-600">
-                        Color: {order.color}
+                        Color: {order.color || 'Black'}
                       </p>
                     </div>
 
@@ -189,7 +189,7 @@ export default function OrderHistory() {
                         {order.stlFileUrl && (
                           <a 
                             href={order.stlFileUrl} 
-                            download={`formily-${order.style}-${order.id.slice(-8)}.stl`}
+                            download={`formily-${order.style || 'model'}-${order.id.slice(-8)}.stl`}
                           >
                             <Button className="w-full" size="sm">
                               <Download className="w-4 h-4 mr-2" />
