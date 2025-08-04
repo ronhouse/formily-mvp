@@ -126,19 +126,49 @@ async function downloadFile(url: string): Promise<Buffer> {
 
 // Save STL file and return public URL
 async function saveSTLFile(stlBuffer: Buffer, filename: string): Promise<string> {
+  console.log(`💾 [SAVE-STL] Starting file save process`);
+  console.log(`📊 [SAVE-STL] Buffer size: ${stlBuffer.length} bytes`);
+  console.log(`📄 [SAVE-STL] Target filename: ${filename}`);
+  
   // Create uploads directory if it doesn't exist
   const uploadsDir = path.join(process.cwd(), 'uploads', 'stl');
+  console.log(`📁 [SAVE-STL] Target directory: ${uploadsDir}`);
+  
   if (!fs.existsSync(uploadsDir)) {
+    console.log(`📁 [SAVE-STL] Directory does not exist, creating...`);
     fs.mkdirSync(uploadsDir, { recursive: true });
+    console.log(`✅ [SAVE-STL] Directory created successfully`);
+  } else {
+    console.log(`✅ [SAVE-STL] Directory already exists`);
   }
 
   const filePath = path.join(uploadsDir, filename);
+  console.log(`🗂️ [SAVE-STL] Full file path: ${filePath}`);
+  
+  console.log(`💾 [SAVE-STL] Writing file to disk...`);
   await fs.promises.writeFile(filePath, stlBuffer);
+  
+  // Verify file was written successfully
+  try {
+    const stats = await fs.promises.stat(filePath);
+    console.log(`✅ [SAVE-STL] File verification successful`);
+    console.log(`📊 [SAVE-STL] File size on disk: ${stats.size} bytes`);
+    console.log(`📅 [SAVE-STL] File created: ${stats.birthtime.toISOString()}`);
+    console.log(`📅 [SAVE-STL] File modified: ${stats.mtime.toISOString()}`);
+  } catch (verifyError: any) {
+    console.error(`❌ [SAVE-STL] File verification failed:`, verifyError);
+    throw new Error(`STL file verification failed: ${verifyError.message}`);
+  }
 
   // Return public URL
   const baseUrl = process.env.REPLIT_DOMAINS || process.env.REPLIT_DEV_DOMAIN || 'localhost:5000';
   const protocol = baseUrl.includes('localhost') ? 'http' : 'https';
-  return `${protocol}://${baseUrl}/api/download-stl/${filename}`;
+  const publicUrl = `${protocol}://${baseUrl}/api/download-stl/${filename}`;
+  
+  console.log(`🔗 [SAVE-STL] Public URL constructed: ${publicUrl}`);
+  console.log(`✅ [SAVE-STL] File save process completed successfully`);
+  
+  return publicUrl;
 }
 
 export interface STLGenerationParams {
@@ -182,50 +212,80 @@ export async function generateSTLWithReplicate(params: STLGenerationParams): Pro
 
   try {
     // Step 1: Validate image URL
-    console.log(`📷 Validating image from: ${params.imageUrl}`);
+    console.log(`🔍 [STL-GEN] Starting STL generation for order: ${params.orderId}`);
+    console.log(`📷 [STL-GEN] Validating image URL: ${params.imageUrl}`);
+    console.log(`🎯 [STL-GEN] Model type: ${params.modelType}`);
     
     // Step 2: Call Replicate TripoSR model
-    console.log(`🚀 Calling Replicate TripoSR model...`);
-    const output = await replicate.run(
-      "camenduru/tripo-sr:e0d3fe8abce3ba86497ea3530d9eae59af7b2231b6c82bedfc32b0732d35ec3a",
-      {
-        input: {
-          image: params.imageUrl,
-        }
+    const modelVersion = "camenduru/tripo-sr:e0d3fe8abce3ba86497ea3530d9eae59af7b2231b6c82bedfc32b0732d35ec3a";
+    console.log(`🚀 [STL-GEN] Calling Replicate TripoSR model: ${modelVersion}`);
+    console.log(`⏱️ [STL-GEN] Request timestamp: ${new Date().toISOString()}`);
+    
+    const output = await replicate.run(modelVersion, {
+      input: {
+        image: params.imageUrl,
       }
-    );
+    });
 
-    console.log(`✅ Replicate processing completed`);
-    console.log(`📦 Output:`, output);
+    console.log(`✅ [STL-GEN] Replicate API response received`);
+    console.log(`📦 [STL-GEN] Response type: ${typeof output}`);
+    console.log(`📝 [STL-GEN] Raw response:`, JSON.stringify(output, null, 2));
 
-    // Step 3: Download the GLB file
+    // Step 3: Extract GLB URL from response
     let glbUrl: string;
     if (typeof output === 'string') {
       glbUrl = output;
+      console.log(`🔗 [STL-GEN] GLB URL extracted from string response`);
     } else if (Array.isArray(output) && output.length > 0) {
       glbUrl = output[0];
+      console.log(`🔗 [STL-GEN] GLB URL extracted from array response (index 0)`);
     } else if (output && typeof output === 'object' && 'glb' in output) {
       glbUrl = (output as any).glb;
+      console.log(`🔗 [STL-GEN] GLB URL extracted from object.glb`);
     } else {
+      console.error(`❌ [STL-GEN] Unexpected Replicate output format:`, output);
       throw new Error(`Unexpected output format from Replicate: ${JSON.stringify(output)}`);
     }
 
-    console.log(`📥 Downloading GLB file from: ${glbUrl}`);
+    if (!glbUrl || !glbUrl.startsWith('http')) {
+      console.error(`❌ [STL-GEN] Invalid GLB URL received: ${glbUrl}`);
+      throw new Error(`Invalid GLB URL received: ${glbUrl}`);
+    }
+
+    console.log(`🔗 [STL-GEN] Valid GLB file URL: ${glbUrl}`);
+
+    // Step 4: Download GLB file
+    console.log(`📥 [STL-GEN] Downloading GLB file from: ${glbUrl}`);
+    const downloadStartTime = Date.now();
+    
     const glbBuffer = await downloadFile(glbUrl);
-    console.log(`📁 GLB file downloaded, size: ${glbBuffer.length} bytes`);
+    const downloadTime = Date.now() - downloadStartTime;
+    
+    console.log(`✅ [STL-GEN] GLB file downloaded successfully`);
+    console.log(`📊 [STL-GEN] GLB file size: ${glbBuffer.length} bytes (${(glbBuffer.length / 1024 / 1024).toFixed(2)} MB)`);
+    console.log(`⏱️ [STL-GEN] Download time: ${downloadTime}ms`);
 
-    // Step 4: Convert GLB to STL
-    console.log(`🔄 Converting GLB to STL format...`);
+    // Step 5: Convert GLB to STL
+    console.log(`🔄 [STL-GEN] Starting GLB to STL conversion...`);
+    const conversionStartTime = Date.now();
+    
     const stlBuffer = await convertGLBtoSTL(glbBuffer);
-    console.log(`📐 STL conversion completed, size: ${stlBuffer.length} bytes`);
+    const conversionTime = Date.now() - conversionStartTime;
+    
+    console.log(`✅ [STL-GEN] STL conversion completed`);
+    console.log(`📊 [STL-GEN] STL file size: ${stlBuffer.length} bytes (${(stlBuffer.length / 1024 / 1024).toFixed(2)} MB)`);
+    console.log(`⏱️ [STL-GEN] Conversion time: ${conversionTime}ms`);
 
-    // Step 5: Save STL file and get public URL
+    // Step 6: Save STL file and get public URL
     const timestamp = Date.now();
     const filename = `${params.orderId}-${params.modelType}-${timestamp}.stl`;
-    console.log(`💾 Saving STL file as: ${filename}`);
+    
+    console.log(`💾 [STL-GEN] Preparing to save STL file`);
+    console.log(`📄 [STL-GEN] Target filename: ${filename}`);
     
     const stlFileUrl = await saveSTLFile(stlBuffer, filename);
-    console.log(`🔗 STL file available at: ${stlFileUrl}`);
+    console.log(`✅ [STL-GEN] STL file saved successfully`);
+    console.log(`🔗 [STL-GEN] STL file available at: ${stlFileUrl}`);
 
     const processingTime = Date.now() - startTime;
     const fileSizeMB = (stlBuffer.length / (1024 * 1024)).toFixed(2);

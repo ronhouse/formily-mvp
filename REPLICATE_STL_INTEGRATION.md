@@ -43,6 +43,54 @@ This implementation replaces the mock STL generation with real 3D model generati
 - **Conversion errors**: GLB-to-STL processing failures
 - **Storage errors**: File saving/serving issues
 
+### Comprehensive Logging System
+
+#### Pipeline Tracking Tags
+The entire STL generation process includes detailed logging with specific tags:
+
+- **[STL-ENDPOINT]** - API endpoint processing logs
+- **[STL-GEN]** - Core generation service logs
+- **[SAVE-STL]** - File saving operation logs  
+- **[STL-DOWNLOAD]** - File download service logs
+
+#### What Gets Logged
+
+1. **STL Generation Endpoint** (`/api/generate-stl/:orderId`)
+   - Request validation and order retrieval
+   - Order details and parameters
+   - Generation timing and performance metrics
+   - Success/failure states with detailed error information
+
+2. **Replicate TripoSR Service** (`generateSTLWithReplicate`)
+   - Replicate API calls with timestamps
+   - Response parsing and GLB URL extraction
+   - File download progress and statistics
+   - GLB to STL conversion timing
+   - File system operations and verification
+
+3. **File Storage Operations** (`saveSTLFile`)
+   - Directory creation and verification
+   - File write operations with size validation
+   - File system verification checks
+   - Public URL construction
+
+4. **Download Service** (`/api/download-stl/:filename`)
+   - Client request details (IP, User-Agent)
+   - File existence checks and directory listings
+   - Stream operations and byte transfer tracking
+   - Error handling with file system diagnostics
+
+#### Log Format Examples
+```
+🔍 [STL-GEN] Starting STL generation for order: abc123
+📷 [STL-GEN] Validating image URL: https://example.com/image.jpg
+🚀 [STL-GEN] Calling Replicate TripoSR model: camenduru/tripo-sr:e0d...
+✅ [STL-GEN] Replicate API response received
+📊 [STL-GEN] GLB file size: 2.4 MB, Download time: 3.2s
+📊 [STL-GEN] STL file size: 1.8 MB, Conversion time: 1.1s
+✅ [STL-GEN] Complete pipeline finished successfully in 28.4s
+```
+
 ### Environment Variables Required
 
 ```bash

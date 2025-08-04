@@ -611,35 +611,51 @@ export async function registerRoutes(app: Express): Promise<void> {
       const { orderId } = req.params;
       
       if (!orderId) {
+        console.error(`❌ [STL-ENDPOINT] No order ID provided`);
         return res.status(400).json({ message: "Order ID is required" });
       }
       
-      console.log(`🎯 Starting STL generation for order: ${orderId}`);
+      console.log(`🔍 [STL-ENDPOINT] Starting STL generation for order: ${orderId}`);
+      console.log(`⏱️ [STL-ENDPOINT] Request timestamp: ${new Date().toISOString()}`);
       
       // Retrieve order from Supabase
+      console.log(`📋 [STL-ENDPOINT] Retrieving order from Supabase...`);
       const { getOrderFromSupabase, updateOrderInSupabase } = await import('./supabase-helper');
       const order = await getOrderFromSupabase(orderId);
       
       if (!order) {
-        console.error(`❌ Order not found: ${orderId}`);
+        console.error(`❌ [STL-ENDPOINT] Order not found in database: ${orderId}`);
         return res.status(404).json({ message: "Order not found" });
       }
       
+      console.log(`✅ [STL-ENDPOINT] Order retrieved successfully`);
+      console.log(`📊 [STL-ENDPOINT] Order details:`, {
+        id: order.id,
+        model_type: order.model_type,
+        status: order.status,
+        image_url: order.image_url ? 'present' : 'missing',
+        engraving_text: order.engraving_text || 'none',
+        created_at: order.created_at
+      });
+      
       if (!order.image_url) {
-        console.error(`❌ No image URL found for order: ${orderId}`);
+        console.error(`❌ [STL-ENDPOINT] No image URL found for order: ${orderId}`);
         return res.status(400).json({ message: "Order has no image URL" });
       }
       
-      console.log(`📷 Retrieved order image URL: ${order.image_url}`);
-      console.log(`🎨 Order details - Model: ${order.model_type}, Text: ${order.engraving_text || 'none'}`);
+      console.log(`📷 [STL-ENDPOINT] Image URL validated: ${order.image_url}`);
+      console.log(`🎨 [STL-ENDPOINT] Generation parameters - Model: ${order.model_type}, Text: ${order.engraving_text || 'none'}`);
       
       // Update order status to processing
+      console.log(`📝 [STL-ENDPOINT] Updating order status to 'processing'...`);
       await updateOrderInSupabase(orderId, { status: 'processing' });
-      console.log(`📝 Order status updated to 'processing'`);
+      console.log(`✅ [STL-ENDPOINT] Order status updated to 'processing'`);
       
       // Real STL generation using Replicate TripoSR
+      console.log(`🚀 [STL-ENDPOINT] Initiating Replicate TripoSR generation...`);
       const { generateSTLWithReplicate } = await import('./replicate-stl-service');
-      const stlResult = await generateSTLWithReplicate({
+      
+      const generationParams = {
         orderId: order.id,
         imageUrl: order.image_url,
         modelType: order.model_type,
@@ -648,17 +664,26 @@ export async function registerRoutes(app: Express): Promise<void> {
         color: order.color,
         quality: order.quality,
         specifications: order.specifications
-      });
+      };
       
-      console.log(`🔗 STL generation completed, file URL: ${stlResult.stlFileUrl}`);
+      console.log(`📋 [STL-ENDPOINT] Generation parameters:`, JSON.stringify(generationParams, null, 2));
+      
+      const generationStartTime = Date.now();
+      const stlResult = await generateSTLWithReplicate(generationParams);
+      const generationDuration = Date.now() - generationStartTime;
+      
+      console.log(`✅ [STL-ENDPOINT] STL generation completed in ${generationDuration}ms`);
+      console.log(`🔗 [STL-ENDPOINT] Generated file URL: ${stlResult.stlFileUrl}`);
+      console.log(`📊 [STL-ENDPOINT] Generation details:`, JSON.stringify(stlResult.details, null, 2));
       
       // Update order with STL file URL and completion status
+      console.log(`📝 [STL-ENDPOINT] Updating order with completion status...`);
       await updateOrderInSupabase(orderId, {
         status: 'completed',
         stl_file_url: stlResult.stlFileUrl
       });
       
-      console.log(`✅ Order ${orderId} completed with STL file`);
+      console.log(`✅ [STL-ENDPOINT] Order ${orderId} marked as completed with STL file`);
       
       // Check if auto dispatch is enabled and trigger dispatch
       if (autoDispatchEnabled) {
@@ -679,21 +704,28 @@ export async function registerRoutes(app: Express): Promise<void> {
       });
       
     } catch (error: any) {
-      console.error(`❌ STL generation failed for order ${req.params.orderId}:`, error);
+      console.error(`❌ [STL-ENDPOINT] STL generation failed for order ${req.params.orderId}`);
+      console.error(`❌ [STL-ENDPOINT] Error type: ${error.constructor.name}`);
+      console.error(`❌ [STL-ENDPOINT] Error message: ${error.message}`);
+      console.error(`❌ [STL-ENDPOINT] Error stack:`, error.stack);
       
       // Update order status to failed
+      console.log(`📝 [STL-ENDPOINT] Updating order status to 'failed'...`);
       try {
         const { updateOrderInSupabase } = await import('./supabase-helper');
         await updateOrderInSupabase(req.params.orderId, { status: 'failed' });
-      } catch (updateError) {
-        console.error(`❌ Failed to update order status to failed:`, updateError);
+        console.log(`✅ [STL-ENDPOINT] Order status updated to 'failed'`);
+      } catch (updateError: any) {
+        console.error(`❌ [STL-ENDPOINT] Failed to update order status to failed:`, updateError);
       }
       
+      console.log(`📤 [STL-ENDPOINT] Sending error response to client`);
       res.status(500).json({ 
         success: false,
         message: "STL generation failed", 
         error: error.message,
-        orderId: req.params.orderId
+        orderId: req.params.orderId,
+        timestamp: new Date().toISOString()
       });
     }
   });
@@ -1238,49 +1270,105 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
-  // STL File Download endpoint (mock)
+  // STL File Download endpoint
   app.get("/api/download-stl/:filename", async (req, res) => {
     try {
       const { filename } = req.params;
-      console.log(`📥 STL download requested: ${filename}`);
+      console.log(`📥 [STL-DOWNLOAD] STL download requested: ${filename}`);
+      console.log(`⏱️ [STL-DOWNLOAD] Request timestamp: ${new Date().toISOString()}`);
+      console.log(`🌐 [STL-DOWNLOAD] Client IP: ${req.ip}`);
+      console.log(`📱 [STL-DOWNLOAD] User Agent: ${req.get('User-Agent')}`);
       
       // Check if file exists in uploads/stl directory
       const fs = await import('fs');
       const path = await import('path');
       const filePath = path.join(process.cwd(), 'uploads', 'stl', filename);
+      console.log(`📁 [STL-DOWNLOAD] Looking for file at: ${filePath}`);
       
+      console.log(`🔍 [STL-DOWNLOAD] Checking file existence...`);
       if (!fs.existsSync(filePath)) {
-        console.error(`❌ STL file not found: ${filename}`);
-        return res.status(404).json({ message: "STL file not found" });
+        console.error(`❌ [STL-DOWNLOAD] STL file not found: ${filename}`);
+        console.error(`❌ [STL-DOWNLOAD] File path checked: ${filePath}`);
+        
+        // List files in directory for debugging
+        try {
+          const stlDir = path.join(process.cwd(), 'uploads', 'stl');
+          const files = await fs.promises.readdir(stlDir);
+          console.log(`📂 [STL-DOWNLOAD] Files in STL directory:`, files);
+        } catch (dirError) {
+          console.error(`❌ [STL-DOWNLOAD] Could not read STL directory:`, dirError);
+        }
+        
+        return res.status(404).json({ 
+          message: "STL file not found",
+          filename: filename,
+          timestamp: new Date().toISOString()
+        });
       }
+      
+      console.log(`✅ [STL-DOWNLOAD] File exists, getting stats...`);
       
       // Get file stats for content length
       const stats = await fs.promises.stat(filePath);
+      console.log(`📊 [STL-DOWNLOAD] File stats:`, {
+        size: stats.size,
+        created: stats.birthtime.toISOString(),
+        modified: stats.mtime.toISOString()
+      });
       
       // Set proper headers for STL file download
+      console.log(`📋 [STL-DOWNLOAD] Setting response headers...`);
       res.setHeader('Content-Type', 'application/octet-stream');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
       res.setHeader('Content-Length', stats.size);
       res.setHeader('Cache-Control', 'private, max-age=3600'); // Cache for 1 hour
+      res.setHeader('X-Download-Timestamp', new Date().toISOString());
+      
+      console.log(`📋 [STL-DOWNLOAD] Headers set successfully`);
       
       // Stream the file
+      console.log(`📤 [STL-DOWNLOAD] Starting file stream...`);
       const readStream = fs.createReadStream(filePath);
-      readStream.pipe(res);
+      
+      let bytesStreamed = 0;
+      
+      readStream.on('data', (chunk) => {
+        bytesStreamed += chunk.length;
+      });
       
       readStream.on('error', (error) => {
-        console.error(`❌ Error streaming STL file:`, error);
+        console.error(`❌ [STL-DOWNLOAD] Error streaming STL file ${filename}:`, error);
         if (!res.headersSent) {
-          res.status(500).json({ message: "Error streaming STL file" });
+          res.status(500).json({ 
+            message: "Error streaming STL file",
+            filename: filename,
+            error: error.message,
+            timestamp: new Date().toISOString()
+          });
         }
       });
       
       readStream.on('end', () => {
-        console.log(`✅ STL file served successfully: ${filename}`);
+        console.log(`✅ [STL-DOWNLOAD] STL file served successfully: ${filename}`);
+        console.log(`📊 [STL-DOWNLOAD] Total bytes streamed: ${bytesStreamed}`);
       });
       
+      readStream.pipe(res);
+      
+      console.log(`🚀 [STL-DOWNLOAD] STL file download started: ${filename} (${stats.size} bytes)`);
+      
     } catch (error: any) {
-      console.error(`❌ Error serving STL file:`, error);
-      res.status(500).json({ message: "Error downloading STL file: " + error.message });
+      console.error(`❌ [STL-DOWNLOAD] Error serving STL file:`, error);
+      console.error(`❌ [STL-DOWNLOAD] Error type: ${error.constructor.name}`);
+      console.error(`❌ [STL-DOWNLOAD] Error message: ${error.message}`);
+      console.error(`❌ [STL-DOWNLOAD] Error stack:`, error.stack);
+      
+      res.status(500).json({ 
+        message: "Error downloading STL file",
+        filename: req.params.filename,
+        error: error.message,
+        timestamp: new Date().toISOString()
+      });
     }
   });
 
