@@ -844,6 +844,22 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   }
 
+  // Admin password verification
+  app.post("/api/admin/verify", (req, res) => {
+    try {
+      const { password } = req.body;
+      const adminSecret = process.env.ADMIN_SECRET || 'formilypass';
+      
+      if (password === adminSecret) {
+        res.json({ success: true });
+      } else {
+        res.status(401).json({ error: 'Invalid password' });
+      }
+    } catch (error: any) {
+      res.status(500).json({ error: 'Authentication failed' });
+    }
+  });
+
   // Admin endpoints for auto dispatch management
   app.get("/api/admin/auto-dispatch", (req, res) => {
     res.json({
