@@ -48,12 +48,17 @@ export default function OrderHistory() {
     }
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
+  const formatDate = (date: Date | string | undefined) => {
+    if (!date) return 'N/A';
+    try {
+      return new Date(date).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      });
+    } catch {
+      return 'N/A';
+    }
   };
 
   if (authLoading || isLoading) {
@@ -136,7 +141,7 @@ export default function OrderHistory() {
                   <div className="flex justify-between items-start">
                     <div>
                       <CardTitle className="text-lg">Order #{order.id.slice(-8).toUpperCase()}</CardTitle>
-                      <p className="text-sm text-gray-600">Placed on {formatDate(order.createdAt.toString())}</p>
+                      <p className="text-sm text-gray-600">Placed on {formatDate(order.createdAt)}</p>
                     </div>
                     <Badge className={getStatusColor(order.status)}>
                       {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
@@ -181,10 +186,10 @@ export default function OrderHistory() {
                       </div>
                       
                       <div className="space-y-2">
-                        {order.stl_file_url && (
+                        {order.stlFileUrl && (
                           <a 
-                            href={order.stl_file_url} 
-                            download={`formily-${order.model_type}-${order.id.slice(-8)}.stl`}
+                            href={order.stlFileUrl} 
+                            download={`formily-${order.style}-${order.id.slice(-8)}.stl`}
                           >
                             <Button className="w-full" size="sm">
                               <Download className="w-4 h-4 mr-2" />
