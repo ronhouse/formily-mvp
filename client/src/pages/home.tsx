@@ -14,7 +14,7 @@ import { FileUpload } from "@/components/ui/file-upload";
 import { ProgressIndicator } from "@/components/ui/progress-indicator";
 import { StyleSelector, STYLE_OPTIONS } from "@/components/ui/style-selector";
 import { LandingHero } from "@/components/ui/landing-hero";
-import { ArrowLeft, ArrowRight, CreditCard, Lightbulb, Download } from "lucide-react";
+import { ArrowLeft, ArrowRight, CreditCard, Lightbulb, Download, Upload, Wand2 } from "lucide-react";
 
 const STEPS = ["Upload Photo", "Choose Style", "Customize", "Payment"];
 const SHIPPING_COST = 4.99;
@@ -40,6 +40,22 @@ export default function Home() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { user: authUser, isLoading: authLoading, isSupabaseAuth } = useAuth();
+
+  // Smooth scroll navigation function
+  const scrollToSection = (sectionId: string) => {
+    const element = document.getElementById(sectionId);
+    if (element) {
+      // Calculate offset to account for fixed header
+      const headerHeight = 80; // Adjust based on header height
+      const elementPosition = element.getBoundingClientRect().top;
+      const offsetPosition = elementPosition + window.pageYOffset - headerHeight;
+
+      window.scrollTo({
+        top: offsetPosition,
+        behavior: 'smooth'
+      });
+    }
+  };
 
   // Ensure page starts at top and prevent unwanted scrolling
   useEffect(() => {
@@ -396,9 +412,24 @@ export default function Home() {
               <h1 className="text-2xl font-bold text-primary">Formily</h1>
             </div>
             <nav className="hidden md:flex space-x-8">
-              <a href="#" className="text-gray-700 hover:text-primary px-3 py-2 text-sm font-medium">How it Works</a>
-              <a href="#" className="text-gray-700 hover:text-primary px-3 py-2 text-sm font-medium">Gallery</a>
-              <a href="#" className="text-gray-700 hover:text-primary px-3 py-2 text-sm font-medium">Pricing</a>
+              <button 
+                onClick={() => scrollToSection('how-it-works')} 
+                className="text-gray-700 hover:text-primary px-3 py-2 text-sm font-medium transition-colors cursor-pointer"
+              >
+                How it Works
+              </button>
+              <button 
+                onClick={() => scrollToSection('gallery')} 
+                className="text-gray-700 hover:text-primary px-3 py-2 text-sm font-medium transition-colors cursor-pointer"
+              >
+                Gallery
+              </button>
+              <button 
+                onClick={() => scrollToSection('pricing')} 
+                className="text-gray-700 hover:text-primary px-3 py-2 text-sm font-medium transition-colors cursor-pointer"
+              >
+                Pricing
+              </button>
               <Link href="/orders" className="text-gray-700 hover:text-primary px-3 py-2 text-sm font-medium">Orders</Link>
             </nav>
             <div className="flex items-center space-x-4">
@@ -467,6 +498,136 @@ export default function Home() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Static Landing Sections - Always Available for Navigation */}
+        <div className="mt-16">
+          {/* How It Works */}
+          <div id="how-it-works" className="grid md:grid-cols-4 gap-6 mb-16">
+            <Card className="text-center">
+              <CardContent className="p-6">
+                <div className="w-12 h-12 bg-primary/10 text-primary rounded-lg flex items-center justify-center mx-auto mb-4">
+                  <Upload className="w-6 h-6" />
+                </div>
+                <h3 className="font-semibold text-gray-900 mb-2">1. Upload Photo</h3>
+                <p className="text-sm text-gray-600">Choose any photo of an object, person, or pet</p>
+              </CardContent>
+            </Card>
+            
+            <Card className="text-center">
+              <CardContent className="p-6">
+                <div className="w-12 h-12 bg-primary/10 text-primary rounded-lg flex items-center justify-center mx-auto mb-4">
+                  <Wand2 className="w-6 h-6" />
+                </div>
+                <h3 className="font-semibold text-gray-900 mb-2">2. Customize Style</h3>
+                <p className="text-sm text-gray-600">Choose trophy, sculpture, or keepsake format with engraving</p>
+              </CardContent>
+            </Card>
+            
+            <Card className="text-center">
+              <CardContent className="p-6">
+                <div className="w-12 h-12 bg-primary/10 text-primary rounded-lg flex items-center justify-center mx-auto mb-4">
+                  <CreditCard className="w-6 h-6" />
+                </div>
+                <h3 className="font-semibold text-gray-900 mb-2">3. Secure Payment</h3>
+                <p className="text-sm text-gray-600">Pay safely with Stripe-powered checkout</p>
+              </CardContent>
+            </Card>
+            
+            <Card className="text-center">
+              <CardContent className="p-6">
+                <div className="w-12 h-12 bg-primary/10 text-primary rounded-lg flex items-center justify-center mx-auto mb-4">
+                  <Download className="w-6 h-6" />
+                </div>
+                <h3 className="font-semibold text-gray-900 mb-2">4. Download STL</h3>
+                <p className="text-sm text-gray-600">Get your 3D-printable file within 24 hours</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Gallery */}
+          <div id="gallery" className="text-center mb-16">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">See What Others Have Created</h2>
+            <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+              <div className="text-center">
+                <img 
+                  src="https://images.unsplash.com/photo-1544551763-46a013bb70d5?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=300" 
+                  alt="Custom hunting trophy example" 
+                  className="rounded-lg shadow-lg mb-3 w-full h-48 object-cover"
+                />
+                <h3 className="font-semibold text-gray-900 mb-1">Hunting Trophy</h3>
+                <p className="text-sm text-gray-600">Detailed busts from hunt photos</p>
+              </div>
+              <div className="text-center">
+                <img 
+                  src="https://images.unsplash.com/photo-1601758228041-f3b2795255f1?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=300" 
+                  alt="Custom pet sculpture example" 
+                  className="rounded-lg shadow-lg mb-3 w-full h-48 object-cover"
+                />
+                <h3 className="font-semibold text-gray-900 mb-1">Pet Sculpture</h3>
+                <p className="text-sm text-gray-600">Memorial keepsakes of beloved pets</p>
+              </div>
+              <div className="text-center">
+                <img 
+                  src="https://images.unsplash.com/photo-1511632765486-a01980e01a18?ixlib=rb-4.0.3&auto=format&fit=crop&w=400&h=300" 
+                  alt="Custom family keepsake example" 
+                  className="rounded-lg shadow-lg mb-3 w-full h-48 object-cover"
+                />
+                <h3 className="font-semibold text-gray-900 mb-1">3D Keepsake</h3>
+                <p className="text-sm text-gray-600">Custom figurines from family moments</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Pricing */}
+          <div id="pricing" className="text-center mb-16">
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">Simple, Transparent Pricing</h2>
+            <div className="grid md:grid-cols-3 gap-6 max-w-4xl mx-auto">
+              <Card className="text-center border-2 border-gray-200">
+                <CardContent className="p-6">
+                  <h3 className="font-semibold text-gray-900 mb-2">3D Keepsake</h3>
+                  <div className="text-3xl font-bold text-primary mb-2">$22.99</div>
+                  <p className="text-sm text-gray-600 mb-4">Perfect for family moments</p>
+                  <ul className="text-left text-sm text-gray-600 space-y-1">
+                    <li>• 3" x 2" x 2" dimensions</li>
+                    <li>• PLA plastic material</li>
+                    <li>• Custom text engraving</li>
+                    <li>• STL file download</li>
+                  </ul>
+                </CardContent>
+              </Card>
+              
+              <Card className="text-center border-2 border-primary bg-primary/5">
+                <CardContent className="p-6">
+                  <div className="text-xs font-medium text-primary mb-2">MOST POPULAR</div>
+                  <h3 className="font-semibold text-gray-900 mb-2">Pet Sculpture</h3>
+                  <div className="text-3xl font-bold text-primary mb-2">$28.99</div>
+                  <p className="text-sm text-gray-600 mb-4">Memorial keepsakes for pets</p>
+                  <ul className="text-left text-sm text-gray-600 space-y-1">
+                    <li>• 4" x 3" x 3" dimensions</li>
+                    <li>• PETG plastic material</li>
+                    <li>• Custom text engraving</li>
+                    <li>• Premium finish quality</li>
+                  </ul>
+                </CardContent>
+              </Card>
+              
+              <Card className="text-center border-2 border-gray-200">
+                <CardContent className="p-6">
+                  <h3 className="font-semibold text-gray-900 mb-2">Hunting Trophy</h3>
+                  <div className="text-3xl font-bold text-primary mb-2">$34.99</div>
+                  <p className="text-sm text-gray-600 mb-4">Detailed trophy busts</p>
+                  <ul className="text-left text-sm text-gray-600 space-y-1">
+                    <li>• 6" x 4" x 4" dimensions</li>
+                    <li>• PLA+ plastic material</li>
+                    <li>• Professional detailing</li>
+                    <li>• Largest size option</li>
+                  </ul>
+                </CardContent>
+              </Card>
+            </div>
+            <p className="text-sm text-gray-500 mt-4">All prices include STL file generation. Shipping costs calculated at checkout.</p>
+          </div>
+        </div>
       </main>
 
       {/* Footer */}
@@ -480,9 +641,30 @@ export default function Home() {
             <div>
               <h4 className="font-medium text-gray-900 mb-3">Product</h4>
               <ul className="space-y-2 text-sm text-gray-600">
-                <li><a href="#" className="hover:text-primary">How it Works</a></li>
-                <li><a href="#" className="hover:text-primary">Gallery</a></li>
-                <li><a href="#" className="hover:text-primary">Pricing</a></li>
+                <li>
+                  <button 
+                    onClick={() => scrollToSection('how-it-works')} 
+                    className="hover:text-primary transition-colors cursor-pointer"
+                  >
+                    How it Works
+                  </button>
+                </li>
+                <li>
+                  <button 
+                    onClick={() => scrollToSection('gallery')} 
+                    className="hover:text-primary transition-colors cursor-pointer"
+                  >
+                    Gallery
+                  </button>
+                </li>
+                <li>
+                  <button 
+                    onClick={() => scrollToSection('pricing')} 
+                    className="hover:text-primary transition-colors cursor-pointer"
+                  >
+                    Pricing
+                  </button>
+                </li>
                 <li><a href="#" className="hover:text-primary">Materials</a></li>
               </ul>
             </div>
