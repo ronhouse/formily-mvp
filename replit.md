@@ -11,6 +11,8 @@ Preferred communication style: Simple, everyday language.
 
 **Deployment Build Process Fixed (August 2025)**: Resolved deployment failure where server couldn't find client build files. Created `build-for-deployment.js` script and `scripts/post-build.js` to properly copy client files from `dist/public/` to `dist/server/public/` where the server expects them. The complete build process now ensures all static files are correctly positioned for production deployment.
 
+**Real STL Generation with Replicate TripoSR Implemented (August 2025)**: Replaced mock STL generation with real 3D model generation using Replicate's TripoSR model. The system now converts user photos into actual 3D models via the `/api/generate-stl/:orderId` endpoint. Implementation includes comprehensive error handling, GLB-to-STL conversion, file storage, and proper fallback mechanisms. Requires REPLICATE_API_TOKEN environment variable and Replicate account credits for operation.
+
 ## System Architecture
 **Full-Stack Monorepo Structure**:
 - **Frontend**: React 18 + TypeScript + Vite, utilizing shadcn/ui (Radix primitives), Tailwind CSS, and Lucide icons for a responsive, mobile-first design. Wouter handles client-side routing.

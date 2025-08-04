@@ -637,8 +637,9 @@ export async function registerRoutes(app: Express): Promise<void> {
       await updateOrderInSupabase(orderId, { status: 'processing' });
       console.log(`📝 Order status updated to 'processing'`);
       
-      // Mock STL generation service call (simulating Replicate or similar service)
-      const stlResult = await mockSTLGenerationService({
+      // Real STL generation using Replicate TripoSR
+      const { generateSTLWithReplicate } = await import('./replicate-stl-service');
+      const stlResult = await generateSTLWithReplicate({
         orderId: order.id,
         imageUrl: order.image_url,
         modelType: order.model_type,
@@ -1243,24 +1244,40 @@ export async function registerRoutes(app: Express): Promise<void> {
       const { filename } = req.params;
       console.log(`📥 STL download requested: ${filename}`);
       
-      // In production, this would stream the actual STL file from storage
-      // For demo purposes, we'll create a mock STL file content
-      const mockSTLContent = `solid FormilyCraft
-        facet normal 0 0 1
-          outer loop
-            vertex 0 0 0
-            vertex 1 0 0
-            vertex 0.5 1 0
-          endloop
-        endfacet
-      endsolid FormilyCraft`;
+      // Check if file exists in uploads/stl directory
+      const fs = await import('fs');
+      const path = await import('path');
+      const filePath = path.join(process.cwd(), 'uploads', 'stl', filename);
       
+      if (!fs.existsSync(filePath)) {
+        console.error(`❌ STL file not found: ${filename}`);
+        return res.status(404).json({ message: "STL file not found" });
+      }
+      
+      // Get file stats for content length
+      const stats = await fs.promises.stat(filePath);
+      
+      // Set proper headers for STL file download
       res.setHeader('Content-Type', 'application/octet-stream');
       res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
-      res.setHeader('Content-Length', Buffer.byteLength(mockSTLContent));
+      res.setHeader('Content-Length', stats.size);
+      res.setHeader('Cache-Control', 'private, max-age=3600'); // Cache for 1 hour
       
-      console.log(`✅ Serving mock STL file: ${filename}`);
-      res.send(mockSTLContent);
+      // Stream the file
+      const readStream = fs.createReadStream(filePath);
+      readStream.pipe(res);
+      
+      readStream.on('error', (error) => {
+        console.error(`❌ Error streaming STL file:`, error);
+        if (!res.headersSent) {
+          res.status(500).json({ message: "Error streaming STL file" });
+        }
+      });
+      
+      readStream.on('end', () => {
+        console.log(`✅ STL file served successfully: ${filename}`);
+      });
+      
     } catch (error: any) {
       console.error(`❌ Error serving STL file:`, error);
       res.status(500).json({ message: "Error downloading STL file: " + error.message });
