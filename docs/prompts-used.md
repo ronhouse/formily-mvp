@@ -70,3 +70,23 @@ Stripe & STL Integration:
 - Prompted agent to fix checkout redirect issue (“Hmm... couldn't reach”)
 - Prompted agent to fix confirmation STL generation link (was pointing to example.com)
 - Final fix added dynamic domain detection, STL download button, and retry fallback
+
+## Phase 4 Key Prompts
+
+### 1. STL Generation Endpoint
+> "Write an endpoint that accepts a Supabase order ID, retrieves the image URL, sends it to a mock STL generation service..."
+
+### 2. Printer Dispatch Endpoint
+> "Create a new Express endpoint: POST /api/send-to-printer/:orderId. Validate completed STL, post to print partner..."
+
+### 3. Admin Panel Page
+> "Create a new React page at `src/pages/admin.tsx` that fetches all orders, displays them in a table..."
+
+### 4. Admin Controls
+> "Add three new admin actions to each order row: Regenerate STL, Mark as Failed, Force Complete..."
+
+### 5. Auto Dispatch + Email System
+> "Add an Auto Dispatch toggle to admin. When enabled, automatically dispatch new completed STL orders..."
+
+### 6. Password Gate for `/admin`
+> "Add a password gate to the admin page that prompts for a shared secret and stores it in localStorage..."

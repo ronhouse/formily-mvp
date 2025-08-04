@@ -40,3 +40,37 @@
 - Uses HTTPS in production, HTTP in dev
 - Ports: 5000 (local), 80 (external)
 
+## PHASE 4 SYSTEM WIRING
+
+### ✅ Stripe Checkout → Supabase
+- Order created on payment success
+- Includes image URL, product type, and customer metadata
+
+### ✅ Supabase → STL Generation
+- `/api/generate-stl/:orderId` fetches image and simulates STL
+- STL URL saved to Supabase, status updated
+
+### ✅ Admin Dashboard
+- `/admin` page loads all orders from Supabase
+- Manual controls wired to:
+  - `/api/generate-stl`
+  - `/api/send-to-printer`
+  - `/api/orders/:orderId/fail`
+  - `/api/orders/:orderId/complete`
+
+### ✅ Auto Dispatch
+- If enabled, system watches for new `status = completed` orders
+- Automatically sends to printer and triggers email
+
+### ✅ Email Notifications
+- Triggered on successful dispatch
+- Uses SendGrid API (`SENDGRID_API_KEY`)
+- Includes STL link + confirmation message
+
+### ✅ Cleanup Endpoint
+- `/api/cleanup-stl` removes old STL records (failed + older than 14 days)
+- Manual trigger only (no cron yet)
+
+### 🚧 Still Mocked
+- STL generation uses fake data, not real AI or mesh service
+- Webhook posts to mock endpoint, not real print API
