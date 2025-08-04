@@ -60,6 +60,7 @@ interface PrintDispatchResponse {
 }
 
 export default function AdminPage() {
+  // All state hooks must be declared before any conditional returns
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [password, setPassword] = useState('');
   const [authLoading, setAuthLoading] = useState(true);
@@ -74,7 +75,7 @@ export default function AdminPage() {
   const [cleanupInProgress, setCleanupInProgress] = useState(false);
   const { toast } = useToast();
 
-  // Check authentication on mount
+  // Check authentication on mount - ALWAYS called
   useEffect(() => {
     const savedAuth = localStorage.getItem('admin_authenticated');
     if (savedAuth === 'true') {
@@ -486,19 +487,22 @@ export default function AdminPage() {
     }
   };
 
+  // Fetch orders and settings when authenticated - ALWAYS called but conditional execution
   useEffect(() => {
-    fetchOrders();
-    
-    // Fetch current auto dispatch setting
-    fetch('/api/admin/auto-dispatch')
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) {
-          setAutoDispatch(data.enabled);
-        }
-      })
-      .catch(err => console.error('Error fetching auto dispatch setting:', err));
-  }, []);
+    if (isAuthenticated) {
+      fetchOrders();
+      
+      // Fetch current auto dispatch setting
+      fetch('/api/admin/auto-dispatch')
+        .then(res => res.json())
+        .then(data => {
+          if (data.success) {
+            setAutoDispatch(data.enabled);
+          }
+        })
+        .catch(err => console.error('Error fetching auto dispatch setting:', err));
+    }
+  }, [isAuthenticated]);
 
   if (loading) {
     return (
