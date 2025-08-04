@@ -1,53 +1,27 @@
-#!/usr/bin/env node
-
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const rootDir = path.resolve(__dirname, '..');
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
-console.log('🔧 Running post-build steps...');
-
-// Copy client build files to where server expects them
-const clientBuildPath = path.resolve(rootDir, 'dist/public');
-const serverExpectedPath = path.resolve(rootDir, 'dist/server/public');
-
-if (fs.existsSync(clientBuildPath)) {
-  // Ensure server directory exists
-  fs.mkdirSync(path.dirname(serverExpectedPath), { recursive: true });
-  
-  // Copy files
-  copyDirectory(clientBuildPath, serverExpectedPath);
-  console.log('✅ Client files copied to server public directory');
-  
-  // Verify critical files exist
-  const indexHtmlPath = path.resolve(serverExpectedPath, 'index.html');
-  if (fs.existsSync(indexHtmlPath)) {
-    console.log('✅ index.html verified in server public directory');
-  } else {
-    console.error('❌ index.html missing after copy');
-    process.exit(1);
-  }
-} else {
-  console.error('❌ Client build not found at:', clientBuildPath);
-  console.error('   Make sure client build completed successfully');
-  process.exit(1);
-}
-
-console.log('🎉 Post-build steps completed successfully!');
-
+// Copy directory function
 function copyDirectory(src, dest) {
+  if (!fs.existsSync(src)) {
+    console.error(`Source directory does not exist: ${src}`);
+    return;
+  }
+  
   if (!fs.existsSync(dest)) {
     fs.mkdirSync(dest, { recursive: true });
   }
-  
+
   const entries = fs.readdirSync(src, { withFileTypes: true });
-  
+
   for (const entry of entries) {
     const srcPath = path.join(src, entry.name);
     const destPath = path.join(dest, entry.name);
-    
+
     if (entry.isDirectory()) {
       copyDirectory(srcPath, destPath);
     } else {
@@ -55,3 +29,30 @@ function copyDirectory(src, dest) {
     }
   }
 }
+
+// Main post-build process
+function postBuild() {
+  const rootDir = path.resolve(__dirname, '..');
+  const clientBuildDir = path.join(rootDir, 'dist', 'public');
+  const serverPublicDir = path.join(rootDir, 'dist', 'server', 'public');
+
+  console.log('Starting post-build process...');
+  console.log(`Copying client files from ${clientBuildDir} to ${serverPublicDir}`);
+
+  if (!fs.existsSync(clientBuildDir)) {
+    console.error(`Client build directory not found: ${clientBuildDir}`);
+    console.error('Make sure to run the client build first');
+    process.exit(1);
+  }
+
+  try {
+    copyDirectory(clientBuildDir, serverPublicDir);
+    console.log('✅ Successfully copied client files to server public directory');
+  } catch (error) {
+    console.error('❌ Error copying client files:', error);
+    process.exit(1);
+  }
+}
+
+// Run the post-build process
+postBuild();

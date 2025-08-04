@@ -9,6 +9,8 @@ Preferred communication style: Simple, everyday language.
 ## Recent Changes (December 2024)
 **Admin Security System Implemented**: Complete admin password gate system with ADMIN_SECRET environment variable authentication (default: 'formilypass'). Fixed React hooks ordering issues by creating separate AdminAuthWrapper component for authentication logic. All admin endpoints functional including auto-dispatch management, print job dispatch, order completion, and STL regeneration.
 
+**Deployment Build Process Fixed (August 2025)**: Resolved deployment failure where server couldn't find client build files. Created `build-for-deployment.js` script and `scripts/post-build.js` to properly copy client files from `dist/public/` to `dist/server/public/` where the server expects them. The complete build process now ensures all static files are correctly positioned for production deployment.
+
 ## System Architecture
 **Full-Stack Monorepo Structure**:
 - **Frontend**: React 18 + TypeScript + Vite, utilizing shadcn/ui (Radix primitives), Tailwind CSS, and Lucide icons for a responsive, mobile-first design. Wouter handles client-side routing.
