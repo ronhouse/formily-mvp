@@ -17,7 +17,6 @@ export function LandingHero({ onGetStarted }: LandingHeroProps) {
         <h1 className="text-5xl font-bold text-gray-900 mb-6 leading-tight">
           Turn Your Photos Into<br />
           <span className="text-primary">Custom 3D Models</span>
-          <span className="text-xs text-gray-400 block mt-2">v2.0 - Vision Roadmap Updates</span>
         </h1>
         <p className="text-xl text-gray-600 max-w-3xl mx-auto mb-8">
           Upload any photo and transform it into a hunting trophy, pet sculpture, or 3D keepsake. 
