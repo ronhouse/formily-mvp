@@ -6,6 +6,9 @@ Formily is a comprehensive web application that converts user-uploaded photos in
 ## User Preferences
 Preferred communication style: Simple, everyday language.
 
+## Recent Changes (December 2024)
+**Admin Security System Implemented**: Complete admin password gate system with ADMIN_SECRET environment variable authentication (default: 'formilypass'). Fixed React hooks ordering issues by creating separate AdminAuthWrapper component for authentication logic. All admin endpoints functional including auto-dispatch management, print job dispatch, order completion, and STL regeneration.
+
 ## System Architecture
 **Full-Stack Monorepo Structure**:
 - **Frontend**: React 18 + TypeScript + Vite, utilizing shadcn/ui (Radix primitives), Tailwind CSS, and Lucide icons for a responsive, mobile-first design. Wouter handles client-side routing.

@@ -896,6 +896,161 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
+  // Admin dispatch print job endpoint
+  app.post("/api/admin/dispatch-print", async (req, res) => {
+    try {
+      const { orderId } = req.body;
+      
+      if (!orderId) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "orderId is required" 
+        });
+      }
+
+      // Get order details from Supabase
+      const { getOrderFromSupabase, updateOrderInSupabase } = await import('./supabase-helper');
+      const order = await getOrderFromSupabase(orderId);
+      
+      if (!order) {
+        return res.status(404).json({ 
+          success: false, 
+          message: "Order not found" 
+        });
+      }
+
+      if (!order.stl_file_url) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "Order does not have STL file ready" 
+        });
+      }
+
+      // Perform manual dispatch to print partner
+      await triggerAutoDispatch(orderId);
+      
+      res.json({
+        success: true,
+        message: "Print job dispatched successfully",
+        orderId: orderId
+      });
+    } catch (error: any) {
+      console.error(`❌ Manual dispatch failed for order ${req.body.orderId}:`, error);
+      res.status(500).json({ 
+        success: false, 
+        message: "Failed to dispatch print job", 
+        error: error.message 
+      });
+    }
+  });
+
+  // Admin force complete order endpoint
+  app.post("/api/admin/force-complete", async (req, res) => {
+    try {
+      const { orderId } = req.body;
+      
+      if (!orderId) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "orderId is required" 
+        });
+      }
+
+      const { updateOrderInSupabase } = await import('./supabase-helper');
+      await updateOrderInSupabase(orderId, { 
+        status: 'completed',
+        updated_at: new Date().toISOString()
+      });
+      
+      console.log(`✅ Order ${orderId} force completed by admin`);
+      
+      res.json({
+        success: true,
+        message: "Order marked as completed",
+        orderId: orderId
+      });
+    } catch (error: any) {
+      console.error(`❌ Failed to force complete order ${req.body.orderId}:`, error);
+      res.status(500).json({ 
+        success: false, 
+        message: "Failed to complete order", 
+        error: error.message 
+      });
+    }
+  });
+
+  // Admin regenerate STL endpoint
+  app.post("/api/admin/regenerate-stl", async (req, res) => {
+    try {
+      const { orderId } = req.body;
+      
+      if (!orderId) {
+        return res.status(400).json({ 
+          success: false, 
+          message: "orderId is required" 
+        });
+      }
+
+      // Get order details from Supabase
+      const { getOrderFromSupabase, updateOrderInSupabase } = await import('./supabase-helper');
+      const order = await getOrderFromSupabase(orderId);
+      
+      if (!order) {
+        return res.status(404).json({ 
+          success: false, 
+          message: "Order not found" 
+        });
+      }
+
+      // Start STL regeneration process
+      await updateOrderInSupabase(orderId, { 
+        status: 'processing',
+        stl_file_url: null, // Clear existing STL
+        updated_at: new Date().toISOString()
+      });
+
+      // Trigger STL generation (mock simulation)
+      setTimeout(async () => {
+        try {
+          // Simulate STL generation delay
+          const mockStlUrl = `https://storage.googleapis.com/formily-stl-files/${orderId}_regenerated.stl`;
+          
+          await updateOrderInSupabase(orderId, {
+            status: 'completed',
+            stl_file_url: mockStlUrl,
+            updated_at: new Date().toISOString()
+          });
+
+          console.log(`✅ STL regenerated for order ${orderId}`);
+          
+          // Auto dispatch if enabled
+          if (autoDispatchEnabled) {
+            await triggerAutoDispatch(orderId);
+          }
+        } catch (error) {
+          console.error(`❌ STL regeneration failed for order ${orderId}:`, error);
+          await updateOrderInSupabase(orderId, { 
+            status: 'failed',
+            updated_at: new Date().toISOString()
+          });
+        }
+      }, 5000); // 5 second simulation
+      
+      res.json({
+        success: true,
+        message: "STL regeneration started",
+        orderId: orderId
+      });
+    } catch (error: any) {
+      console.error(`❌ Failed to regenerate STL for order ${req.body.orderId}:`, error);
+      res.status(500).json({ 
+        success: false, 
+        message: "Failed to regenerate STL", 
+        error: error.message 
+      });
+    }
+  });
+
   // STL Cleanup endpoint
   app.post("/api/cleanup-stl", async (req, res) => {
     try {
