@@ -217,6 +217,45 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
+  // Serve uploaded files
+  app.get("/uploads/:filename", async (req, res) => {
+    try {
+      const { filename } = req.params;
+      console.log(`📁 [FILE-SERVE] Serving uploaded file: ${filename}`);
+      
+      const fs = await import('fs');
+      const path = await import('path');
+      const filePath = path.join(process.cwd(), 'uploads', filename);
+      
+      // Check if file exists
+      if (!fs.existsSync(filePath)) {
+        console.error(`❌ [FILE-SERVE] File not found: ${filePath}`);
+        return res.status(404).json({ message: "File not found" });
+      }
+      
+      // Get file stats and set headers
+      const stats = await fs.promises.stat(filePath);
+      const mimeType = filename.toLowerCase().endsWith('.jpg') || filename.toLowerCase().endsWith('.jpeg') ? 'image/jpeg' :
+                      filename.toLowerCase().endsWith('.png') ? 'image/png' :
+                      filename.toLowerCase().endsWith('.heic') ? 'image/heic' :
+                      'application/octet-stream';
+      
+      res.setHeader('Content-Type', mimeType);
+      res.setHeader('Content-Length', stats.size);
+      res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 24 hours
+      
+      console.log(`✅ [FILE-SERVE] Serving ${filename} (${stats.size} bytes, ${mimeType})`);
+      
+      // Stream the file
+      const readStream = fs.createReadStream(filePath);
+      readStream.pipe(res);
+      
+    } catch (error: any) {
+      console.error(`❌ [FILE-SERVE] Error serving file:`, error);
+      res.status(500).json({ message: "Error serving file: " + error.message });
+    }
+  });
+
   // File upload
   app.post("/api/upload", upload.single('photo'), async (req, res) => {
     try {
@@ -224,9 +263,55 @@ export async function registerRoutes(app: Express): Promise<void> {
         return res.status(400).json({ message: "No file uploaded" });
       }
 
-      // In a real implementation, you would upload to Supabase Storage
-      // For now, we'll simulate a file URL
-      const fileUrl = `https://example.com/uploads/${Date.now()}-${req.file.originalname}`;
+      console.log(`📤 [UPLOAD] Starting file upload process`);
+      console.log(`📄 [UPLOAD] Original filename: ${req.file.originalname}`);
+      console.log(`📊 [UPLOAD] File size: ${req.file.size} bytes`);
+      console.log(`🎯 [UPLOAD] MIME type: ${req.file.mimetype}`);
+
+      // Save file to uploads directory with timestamp
+      const fs = await import('fs');
+      const path = await import('path');
+      const { promises: fsPromises } = fs;
+      
+      const timestamp = Date.now();
+      const fileExtension = path.extname(req.file.originalname);
+      const baseName = path.basename(req.file.originalname, fileExtension);
+      const filename = `${timestamp}-${baseName}${fileExtension}`;
+      
+      // Ensure uploads directory exists
+      const uploadsDir = path.join(process.cwd(), 'uploads');
+      try {
+        await fsPromises.mkdir(uploadsDir, { recursive: true });
+      } catch (error: any) {
+        if (error.code !== 'EEXIST') {
+          throw error;
+        }
+      }
+      
+      // Save file to disk
+      const filePath = path.join(uploadsDir, filename);
+      await fsPromises.writeFile(filePath, req.file.buffer);
+      
+      console.log(`💾 [UPLOAD] File saved to: ${filePath}`);
+      
+      // Verify file was written
+      const stats = await fsPromises.stat(filePath);
+      console.log(`✅ [UPLOAD] File verification successful - Size: ${stats.size} bytes`);
+      
+      // Construct public URL for the uploaded file
+      const replicateUrl = process.env.REPLIT_DOMAINS || process.env.REPLIT_DEV_DOMAIN;
+      const baseUrl = replicateUrl || req.get('host') || 'localhost:5000';
+      const protocol = baseUrl.includes('localhost') ? 'http' : 'https';
+      const fileUrl = `${protocol}://${baseUrl}/uploads/${filename}`;
+      
+      console.log(`🔍 [UPLOAD] Environment debug:`);
+      console.log(`   - REPLIT_DOMAINS: ${process.env.REPLIT_DOMAINS}`);
+      console.log(`   - REPLIT_DEV_DOMAIN: ${process.env.REPLIT_DEV_DOMAIN}`);
+      console.log(`   - req.get('host'): ${req.get('host')}`);
+      console.log(`   - Selected baseUrl: ${baseUrl}`);
+      console.log(`   - Protocol: ${protocol}`);
+      console.log(`🔗 [UPLOAD] Public URL: ${fileUrl}`);
+      console.log(`✅ [UPLOAD] Upload process completed successfully`);
       
       res.json({ 
         url: fileUrl,
