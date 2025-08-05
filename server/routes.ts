@@ -384,38 +384,33 @@ export async function registerRoutes(app: Express): Promise<void> {
   app.get("/api/orders/user/:userId", async (req, res) => {
     try {
       const { userId } = req.params;
-      const { getSupabaseClient } = await import('./supabase-helper');
-      const supabase = getSupabaseClient();
       
-      console.log('🔍 Fetching orders for user:', userId);
+      console.log('🔍 Fetching orders for user from development database:', userId);
       
-      const { data: orders, error } = await supabase
-        .from('orders')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
-        
-      if (error) {
-        console.error('❌ Error fetching user orders:', error);
-        throw new Error(error.message);
-      }
+      // Use development database storage (consistent with order creation)
+      const orders = await storage.getOrdersByUserId(userId);
       
       console.log(`✅ Found ${orders.length} orders for user ${userId}`);
       res.json(orders);
     } catch (error: any) {
+      console.error('❌ Error fetching user orders from development database:', error.message);
       res.status(500).json({ message: "Error fetching orders: " + error.message });
     }
   });
 
   app.get("/api/orders/:id", async (req, res) => {
     try {
-      const { getOrderFromSupabase } = await import('./supabase-helper');
-      const order = await getOrderFromSupabase(req.params.id);
+      // Use development database storage (consistent with order creation)
+      const order = await storage.getOrder(req.params.id);
       
-      console.log('✅ Order retrieved from Supabase:', order.id);
+      if (!order) {
+        return res.status(404).json({ message: "Order not found" });
+      }
+      
+      console.log('✅ Order retrieved from development database:', order.id);
       res.json(order);
     } catch (error: any) {
-      console.error('❌ Error fetching order from Supabase:', error.message);
+      console.error('❌ Error fetching order from development database:', error.message);
       res.status(500).json({ message: "Error fetching order: " + error.message });
     }
   });
