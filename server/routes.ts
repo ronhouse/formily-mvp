@@ -106,10 +106,10 @@ async function triggerSTLGeneration(order: any) {
     
     const webhookPayload = {
       order_id: order.id,
-      image_url: order.photoUrl,
-      model_type: order.style,
-      engraving_text: order.engravingText,
-      font_style: order.fontStyle,
+      image_url: order.image_url,
+      model_type: order.model_type,
+      engraving_text: order.engraving_text,
+      font_style: order.font_style,
       color: order.color,
       quality: order.quality,
       specifications: order.specifications
@@ -128,17 +128,18 @@ async function triggerSTLGeneration(order: any) {
     
     const mockResponse = {
       status: "ready",
-      stl_file_url: `${protocol}://${baseUrl}/api/download-stl/${order.id}-${order.style}-${timestamp}.stl`
+      stl_file_url: `${protocol}://${baseUrl}/api/download-stl/${order.id}-${order.model_type}-${timestamp}.stl`
     };
     
     console.log(`🔗 Generated STL URL: ${mockResponse.stl_file_url}`);
 
     console.log(`🎉 STL Generation Response:`, JSON.stringify(mockResponse, null, 2));
 
-    // Update order with STL generation results (use development database)
-    await storage.updateOrder(order.id, {
+    // Update order with STL generation results (use Supabase)
+    const { updateOrderInSupabase } = await import('./supabase-helper');
+    await updateOrderInSupabase(order.id, {
       status: 'ready',
-      stlFileUrl: mockResponse.stl_file_url
+      stl_file_url: mockResponse.stl_file_url
     });
 
     console.log(`✅ Order ${order.id} updated with STL file: ${mockResponse.stl_file_url}`);
@@ -238,7 +239,7 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
-  // Orders - Using development database for reliability
+  // Orders - Using Supabase for scalability
   app.post("/api/orders", async (req, res) => {
     try {
       console.log('📝 Creating new order with data:', JSON.stringify(req.body, null, 2));
@@ -264,48 +265,59 @@ export async function registerRoutes(app: Express): Promise<void> {
       
       console.log('✅ Image URL validation passed');
       
-      // Use development database (reliable and working)
-      console.log('💾 Creating order in development database...');
+      // Use Supabase for scalability and expansion
+      console.log('💾 Creating order in Supabase...');
       
-      // Ensure user exists in development database
-      let user = await storage.getUserByAnonymousId(orderData.userId);
+      const { getSupabaseClient, getUserFromSupabase } = await import('./supabase-helper');
+      const supabase = getSupabaseClient();
+      
+      // Ensure user exists in Supabase
+      let user = await getUserFromSupabase(orderData.userId);
       if (!user) {
-        console.log('👤 User not found, creating user first...');
-        user = await storage.createUser({
-          anonymousId: orderData.userId,
-          email: `user-${orderData.userId}@example.com`
-        });
-        console.log('✅ User created:', user.id);
+        console.log('👤 User not found, creating user in Supabase...');
+        const { data: newUser, error: userError } = await supabase
+          .from('users')
+          .insert({
+            anonymous_id: orderData.userId,
+            email: `user-${orderData.userId}@example.com`
+          })
+          .select()
+          .single();
+          
+        if (userError) {
+          console.error('❌ User creation error:', userError);
+          throw new Error(`Failed to create user: ${userError.message}`);
+        }
+        user = newUser;
+        console.log('✅ User created in Supabase:', user.id);
       } else {
-        console.log('✅ User already exists:', user.id);
+        console.log('✅ User already exists in Supabase:', user.id);
       }
       
-      const order = await storage.createOrder({
-        userId: user.id,
-        photoUrl: orderData.photoUrl,
-        style: orderData.style,
-        engravingText: orderData.engravingText,
-        fontStyle: orderData.fontStyle,
-        color: orderData.color,
-        quality: orderData.quality,
-        totalAmount: orderData.totalAmount,
-        specifications: orderData.specifications,
-        stripePaymentIntentId: orderData.stripePaymentIntentId
-      });
+      // Create order in Supabase with snake_case field mapping
+      const { data: order, error: orderError } = await supabase
+        .from('orders')
+        .insert({
+          user_id: user.id,
+          image_url: orderData.photoUrl,
+          model_type: orderData.style,
+          engraving_text: orderData.engravingText,
+          font_style: orderData.fontStyle,
+          color: orderData.color,
+          quality: orderData.quality,
+          total_amount: orderData.totalAmount,
+          specifications: orderData.specifications,
+          stripe_payment_intent_id: orderData.stripePaymentIntentId
+        })
+        .select()
+        .single();
+        
+      if (orderError) {
+        console.error('❌ Order creation error:', orderError);
+        throw new Error(`Failed to create order: ${orderError.message}`);
+      }
       
-      console.log('✅ Order created successfully in development database:', order.id);
-      
-      return res.json({
-        ...order,
-        message: "Order created successfully"
-      });
-      
-      console.log('✅ SUPABASE INSERT SUCCESSFUL:');
-      console.log('- Order ID:', order.id);
-      console.log('- All returned fields:', Object.keys(order));
-      console.log('- image_url stored:', order.image_url);
-      console.log('- model_type stored:', order.model_type);
-      console.log('- engraving_text stored:', order.engraving_text);
+      console.log('✅ Order created successfully in Supabase:', order.id);
       
       // Convert snake_case back to camelCase for frontend compatibility
       const formattedOrder = {
@@ -321,19 +333,16 @@ export async function registerRoutes(app: Express): Promise<void> {
         totalAmount: order.total_amount,
         stripePaymentIntentId: order.stripe_payment_intent_id,
         stlFileUrl: order.stl_file_url,
+        printDispatched: order.print_dispatched,
         specifications: order.specifications,
         createdAt: order.created_at,
         updatedAt: order.updated_at,
       };
       
-      console.log('📊 Formatted response for frontend:', {
-        id: formattedOrder.id,
-        image_url: formattedOrder.photoUrl,
-        model_type: formattedOrder.style,
-        engraving_text: formattedOrder.engravingText
+      return res.json({
+        ...formattedOrder,
+        message: "Order created successfully"
       });
-      
-      res.json(formattedOrder);
     } catch (error: any) {
       console.error('💥 Order creation failed:', error);
       if (error.name === 'ZodError') {
@@ -380,32 +389,95 @@ export async function registerRoutes(app: Express): Promise<void> {
     try {
       const { userId } = req.params;
       
-      console.log('🔍 Fetching orders for user from development database:', userId);
+      console.log('🔍 Fetching orders for user from Supabase:', userId);
       
-      // Use development database (consistent with order creation)
-      const orders = await storage.getOrdersByUserId(userId);
+      // Use Supabase (consistent with order creation)
+      const { getSupabaseClient, getUserFromSupabase } = await import('./supabase-helper');
+      const supabase = getSupabaseClient();
+      
+      // Get user by anonymous ID to find the actual user_id
+      const user = await getUserFromSupabase(userId);
+      if (!user) {
+        console.log(`👤 User not found: ${userId}`);
+        return res.json([]); // Return empty array if user doesn't exist
+      }
+      
+      // Fetch orders by user_id
+      const { data: orders, error } = await supabase
+        .from('orders')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('❌ Error fetching user orders:', error);
+        throw new Error(error.message);
+      }
       
       console.log(`✅ Found ${orders.length} orders for user ${userId}`);
-      res.json(orders);
+      
+      // Convert snake_case to camelCase for frontend compatibility
+      const formattedOrders = orders.map(order => ({
+        id: order.id,
+        userId: order.user_id,
+        status: order.status,
+        photoUrl: order.image_url,
+        style: order.model_type,
+        engravingText: order.engraving_text,
+        fontStyle: order.font_style,
+        color: order.color,
+        quality: order.quality,
+        totalAmount: order.total_amount,
+        stripePaymentIntentId: order.stripe_payment_intent_id,
+        stlFileUrl: order.stl_file_url,
+        printDispatched: order.print_dispatched,
+        specifications: order.specifications,
+        createdAt: order.created_at,
+        updatedAt: order.updated_at,
+      }));
+      
+      res.json(formattedOrders);
     } catch (error: any) {
-      console.error('❌ Error fetching user orders from development database:', error.message);
+      console.error('❌ Error fetching user orders from Supabase:', error.message);
       res.status(500).json({ message: "Error fetching orders: " + error.message });
     }
   });
 
   app.get("/api/orders/:id", async (req, res) => {
     try {
-      // Use development database (consistent with order creation)
-      const order = await storage.getOrder(req.params.id);
+      // Use Supabase (consistent with order creation)
+      const { getOrderFromSupabase } = await import('./supabase-helper');
+      const order = await getOrderFromSupabase(req.params.id);
       
       if (!order) {
         return res.status(404).json({ message: "Order not found" });
       }
       
-      console.log('✅ Order retrieved from development database:', order.id);
-      res.json(order);
+      console.log('✅ Order retrieved from Supabase:', order.id);
+      
+      // Convert snake_case to camelCase for frontend compatibility
+      const formattedOrder = {
+        id: order.id,
+        userId: order.user_id,
+        status: order.status,
+        photoUrl: order.image_url,
+        style: order.model_type,
+        engravingText: order.engraving_text,
+        fontStyle: order.font_style,
+        color: order.color,
+        quality: order.quality,
+        totalAmount: order.total_amount,
+        stripePaymentIntentId: order.stripe_payment_intent_id,
+        stlFileUrl: order.stl_file_url,
+        printDispatched: order.print_dispatched,
+        specifications: order.specifications,
+        createdAt: order.created_at,
+        updatedAt: order.updated_at,
+      };
+      
+      res.json(formattedOrder);
     } catch (error: any) {
-      console.error('❌ Error fetching order from development database:', error.message);
+      console.error('❌ Error fetching order from Supabase:', error.message);
       res.status(500).json({ message: "Error fetching order: " + error.message });
     }
   });
@@ -449,8 +521,9 @@ export async function registerRoutes(app: Express): Promise<void> {
         return res.status(400).json({ message: "Order ID is required" });
       }
 
-      // Get order details from development database (consistent with order creation)
-      const order = await storage.getOrder(orderId);
+      // Get order details from Supabase (consistent with order creation)
+      const { getOrderFromSupabase } = await import('./supabase-helper');
+      const order = await getOrderFromSupabase(orderId);
       if (!order) {
         return res.status(404).json({ message: "Order not found" });
       }
@@ -472,11 +545,11 @@ export async function registerRoutes(app: Express): Promise<void> {
             price_data: {
               currency: 'usd',
               product_data: {
-                name: `Custom 3D ${order.style.charAt(0).toUpperCase() + order.style.slice(1)}`,
-                description: order.engravingText ? `Engraved: "${order.engravingText}"` : 'Custom 3D printed model',
+                name: `Custom 3D ${order.model_type.charAt(0).toUpperCase() + order.model_type.slice(1)}`,
+                description: order.engraving_text ? `Engraved: "${order.engraving_text}"` : 'Custom 3D printed model',
                 // Remove images array since order.photoUrl may not be a valid public URL for Stripe
               },
-              unit_amount: Math.round(parseFloat(order.totalAmount) * 100), // Convert to cents
+              unit_amount: Math.round(parseFloat(order.total_amount) * 100), // Convert to cents
             },
             quantity: 1,
           },
@@ -486,9 +559,9 @@ export async function registerRoutes(app: Express): Promise<void> {
         cancel_url: cancelUrl,
         metadata: {
           orderId: orderId,
-          model_type: order.style,
-          engraving_text: order.engravingText || '',
-          total_amount: order.totalAmount,
+          model_type: order.model_type,
+          engraving_text: order.engraving_text || '',
+          total_amount: order.total_amount,
         },
       });
 
@@ -524,9 +597,10 @@ export async function registerRoutes(app: Express): Promise<void> {
         console.log(`📦 Order ID from session: ${orderId}`);
         
         if (orderId) {
-          // Update order with payment info and status (use development database)
-          await storage.updateOrder(orderId, {
-            stripePaymentIntentId: paymentIntentId,
+          // Update order with payment info and status (use Supabase)
+          const { updateOrderInSupabase } = await import('./supabase-helper');
+          await updateOrderInSupabase(orderId, {
+            stripe_payment_intent_id: paymentIntentId,
             status: 'paid',
           });
           
@@ -535,7 +609,8 @@ export async function registerRoutes(app: Express): Promise<void> {
 
           // Trigger STL generation webhook
           try {
-            const order = await storage.getOrder(orderId);
+            const { getOrderFromSupabase } = await import('./supabase-helper');
+            const order = await getOrderFromSupabase(orderId);
             if (order) {
               console.log(`🔨 Triggering STL generation for order: ${orderId}`);
               await triggerSTLGeneration(order);
