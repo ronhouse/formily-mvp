@@ -232,39 +232,51 @@ export async function generateSTLWithReplicate(params: STLGenerationParams): Pro
     console.log(`📦 [STL-GEN] Response type: ${typeof output}`);
     console.log(`📝 [STL-GEN] Raw response:`, JSON.stringify(output, null, 2));
 
-    // Step 3: Extract GLB URL from response
-    let glbUrl: string;
-    if (typeof output === 'string') {
-      glbUrl = output;
-      console.log(`🔗 [STL-GEN] GLB URL extracted from string response`);
-    } else if (Array.isArray(output) && output.length > 0) {
-      glbUrl = output[0];
-      console.log(`🔗 [STL-GEN] GLB URL extracted from array response (index 0)`);
-    } else if (output && typeof output === 'object' && 'glb' in output) {
-      glbUrl = (output as any).glb;
-      console.log(`🔗 [STL-GEN] GLB URL extracted from object.glb`);
+    // Step 3: Handle GLB data from response  
+    let glbBuffer: Buffer;
+    
+    if (typeof output === 'string' && (output as string).startsWith('http')) {
+      console.log(`🔗 [STL-GEN] GLB URL received: ${output}`);
+      console.log(`📥 [STL-GEN] Downloading GLB file from URL...`);
+      glbBuffer = await downloadFile(output);
+      console.log(`✅ [STL-GEN] GLB file downloaded: ${glbBuffer.length} bytes`);
+    } else if (output instanceof ReadableStream) {
+      console.log(`📦 [STL-GEN] Received GLB data as ReadableStream`);
+      
+      // Convert ReadableStream to Buffer
+      const reader = output.getReader();
+      const chunks: Uint8Array[] = [];
+      
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          chunks.push(value);
+        }
+        
+        // Concatenate all chunks into a single buffer
+        const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+        const glbArrayBuffer = new Uint8Array(totalLength);
+        let offset = 0;
+        
+        for (const chunk of chunks) {
+          glbArrayBuffer.set(chunk, offset);
+          offset += chunk.length;
+        }
+        
+        glbBuffer = Buffer.from(glbArrayBuffer);
+        console.log(`✅ [STL-GEN] GLB data processed from stream: ${glbBuffer.length} bytes`);
+      } finally {
+        reader.releaseLock();
+      }
     } else {
       console.error(`❌ [STL-GEN] Unexpected Replicate output format:`, output);
+      console.error(`❌ [STL-GEN] Output type: ${typeof output}`);
+      console.error(`❌ [STL-GEN] Constructor: ${output?.constructor?.name}`);
       throw new Error(`Unexpected output format from Replicate: ${JSON.stringify(output)}`);
     }
 
-    if (!glbUrl || !glbUrl.startsWith('http')) {
-      console.error(`❌ [STL-GEN] Invalid GLB URL received: ${glbUrl}`);
-      throw new Error(`Invalid GLB URL received: ${glbUrl}`);
-    }
-
-    console.log(`🔗 [STL-GEN] Valid GLB file URL: ${glbUrl}`);
-
-    // Step 4: Download GLB file
-    console.log(`📥 [STL-GEN] Downloading GLB file from: ${glbUrl}`);
-    const downloadStartTime = Date.now();
-    
-    const glbBuffer = await downloadFile(glbUrl);
-    const downloadTime = Date.now() - downloadStartTime;
-    
-    console.log(`✅ [STL-GEN] GLB file downloaded successfully`);
-    console.log(`📊 [STL-GEN] GLB file size: ${glbBuffer.length} bytes (${(glbBuffer.length / 1024 / 1024).toFixed(2)} MB)`);
-    console.log(`⏱️ [STL-GEN] Download time: ${downloadTime}ms`);
+    console.log(`📊 [STL-GEN] GLB data ready: ${glbBuffer.length} bytes (${(glbBuffer.length / 1024 / 1024).toFixed(2)} MB)`);
 
     // Step 5: Convert GLB to STL
     console.log(`🔄 [STL-GEN] Starting GLB to STL conversion...`);
