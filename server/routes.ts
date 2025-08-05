@@ -265,7 +265,7 @@ export async function registerRoutes(app: Express): Promise<void> {
       
       console.log('✅ Image URL validation passed');
       
-      // Use development database storage (reliable for development)
+      // Use development database (reliable and working)
       console.log('💾 Creating order in development database...');
       
       // Ensure user exists in development database
@@ -281,10 +281,10 @@ export async function registerRoutes(app: Express): Promise<void> {
         console.log('✅ User already exists:', user.id);
       }
       
-      const createOrderPayload = {
-        userId: user.id,  // Use the actual user ID from the database
-        photoUrl: orderData.photoUrl,  // Fixed: was imageUrl, should be photoUrl
-        style: orderData.style,        // Fixed: was modelType, should be style  
+      const order = await storage.createOrder({
+        userId: user.id,
+        photoUrl: orderData.photoUrl,
+        style: orderData.style,
         engravingText: orderData.engravingText,
         fontStyle: orderData.fontStyle,
         color: orderData.color,
@@ -292,11 +292,7 @@ export async function registerRoutes(app: Express): Promise<void> {
         totalAmount: orderData.totalAmount,
         specifications: orderData.specifications,
         stripePaymentIntentId: orderData.stripePaymentIntentId
-      };
-      
-
-      
-      const order = await storage.createOrder(createOrderPayload);
+      });
       
       console.log('✅ Order created successfully in development database:', order.id);
       
@@ -387,7 +383,7 @@ export async function registerRoutes(app: Express): Promise<void> {
       
       console.log('🔍 Fetching orders for user from development database:', userId);
       
-      // Use development database storage (consistent with order creation)
+      // Use development database (consistent with order creation)
       const orders = await storage.getOrdersByUserId(userId);
       
       console.log(`✅ Found ${orders.length} orders for user ${userId}`);
@@ -400,7 +396,7 @@ export async function registerRoutes(app: Express): Promise<void> {
 
   app.get("/api/orders/:id", async (req, res) => {
     try {
-      // Use development database storage (consistent with order creation)
+      // Use development database (consistent with order creation)
       const order = await storage.getOrder(req.params.id);
       
       if (!order) {

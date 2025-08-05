@@ -55,19 +55,81 @@ export async function updateOrderInSupabase(orderId: string, updates: any) {
   return data;
 }
 
-// Helper to get user by ID from Supabase
-export async function getUserFromSupabase(userId: string) {
+// Helper to get user by anonymous ID from Supabase
+export async function getUserFromSupabase(anonymousId: string) {
   const supabase = getSupabaseClient();
   
   const { data, error } = await supabase
     .from('users')
     .select('*')
-    .eq('id', userId)
+    .eq('anonymous_id', anonymousId)
+    .single();
+    
+  if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
+    console.error('❌ Supabase user fetch error:', error);
+    throw new Error(`Failed to fetch user: ${error.message}`);
+  }
+  
+  return data;
+}
+
+// Helper to create user in Supabase
+export async function createUserInSupabase(userData: { anonymousId: string; email: string }) {
+  const supabase = getSupabaseClient();
+  
+  const { data, error } = await supabase
+    .from('users')
+    .insert({
+      anonymous_id: userData.anonymousId,
+      email: userData.email
+    })
+    .select()
     .single();
     
   if (error) {
-    console.error('❌ Supabase user fetch error:', error);
-    throw new Error(`Failed to fetch user: ${error.message}`);
+    console.error('❌ Supabase user creation error:', error);
+    throw new Error(`Failed to create user: ${error.message}`);
+  }
+  
+  return data;
+}
+
+// Helper to create order in Supabase
+export async function createOrderInSupabase(orderData: {
+  userId: string;
+  photoUrl: string;
+  style: string;
+  engravingText?: string;
+  fontStyle?: string;
+  color?: string;
+  quality?: string;
+  totalAmount: string;
+  specifications?: any;
+  stripePaymentIntentId?: string;
+}) {
+  const supabase = getSupabaseClient();
+  
+  const { data, error } = await supabase
+    .from('orders')
+    .insert({
+      user_id: orderData.userId,
+      image_url: orderData.photoUrl,
+      model_type: orderData.style,
+      engraving_text: orderData.engravingText,
+      font_style: orderData.fontStyle,
+      color: orderData.color,
+      quality: orderData.quality,
+      total_amount: orderData.totalAmount,
+      specifications: orderData.specifications,
+      stripe_payment_intent_id: orderData.stripePaymentIntentId,
+      status: 'pending'
+    })
+    .select()
+    .single();
+    
+  if (error) {
+    console.error('❌ Supabase order creation error:', error);
+    throw new Error(`Failed to create order: ${error.message}`);
   }
   
   return data;
