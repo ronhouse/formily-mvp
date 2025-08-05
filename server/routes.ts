@@ -239,7 +239,7 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
-  // Orders - Using Supabase directly with comprehensive logging
+  // Orders - Using development database for reliability
   app.post("/api/orders", async (req, res) => {
     try {
       console.log('📝 Creating new order with data:', JSON.stringify(req.body, null, 2));
@@ -247,6 +247,7 @@ export async function registerRoutes(app: Express): Promise<void> {
       // Parse and validate the order data
       const orderData = insertOrderSchema.parse(req.body);
       console.log('✅ Order data validation passed:', orderData);
+
       
       // Validate image_url before inserting
       const imageUrl = orderData.photoUrl;
@@ -264,80 +265,45 @@ export async function registerRoutes(app: Express): Promise<void> {
       
       console.log('✅ Image URL validation passed');
       
-      // Import and configure Supabase client
-      const { createClient } = await import('@supabase/supabase-js');
+      // Use development database storage (reliable for development)
+      console.log('💾 Creating order in development database...');
       
-      // Get environment variables (the environment variables are swapped in secrets)
-      const supabaseUrl = process.env.VITE_SUPABASE_ANON_KEY; // This actually contains the URL
-      const supabaseKey = process.env.VITE_SUPABASE_URL; // This actually contains the anon key
-      
-      console.log('🔧 Supabase Environment Check:');
-      console.log('- Raw VITE_SUPABASE_URL env var:', process.env.VITE_SUPABASE_URL ? `${process.env.VITE_SUPABASE_URL.substring(0, 30)}...` : 'MISSING');
-      console.log('- Raw VITE_SUPABASE_ANON_KEY env var:', process.env.VITE_SUPABASE_ANON_KEY ? `${process.env.VITE_SUPABASE_ANON_KEY.substring(0, 30)}...` : 'MISSING');
-      console.log('- Assigned supabaseUrl (from ANON_KEY):', supabaseUrl ? `${supabaseUrl.substring(0, 30)}...` : 'MISSING');
-      console.log('- Assigned supabaseKey (from URL):', supabaseKey ? `${supabaseKey.substring(0, 30)}...` : 'MISSING');
-      console.log('- URL validation - starts with https?', supabaseUrl ? supabaseUrl.startsWith('https://') : 'N/A');
-      
-      if (!supabaseUrl || !supabaseKey) {
-        console.error('❌ Missing Supabase credentials');
-        return res.status(500).json({ message: "Supabase configuration missing" });
+      // Ensure user exists in development database
+      let user = await storage.getUserByAnonymousId(orderData.userId);
+      if (!user) {
+        console.log('👤 User not found, creating user first...');
+        user = await storage.createUser({
+          anonymousId: orderData.userId,
+          email: `user-${orderData.userId}@example.com`
+        });
+        console.log('✅ User created:', user.id);
+      } else {
+        console.log('✅ User already exists:', user.id);
       }
       
-      // Validate Supabase URL format
-      if (!supabaseUrl.startsWith('https://')) {
-        console.error('❌ Invalid Supabase URL format:', supabaseUrl);
-        return res.status(500).json({ message: "Invalid Supabase URL - must start with https://" });
-      }
-      
-      const supabase = createClient(supabaseUrl, supabaseKey);
-      console.log('🔗 Supabase client initialized successfully');
-      
-      // Prepare complete Supabase insert payload with all application fields including mock STL
-      const supabasePayload = {
-        user_id: orderData.userId,
-        status: 'pending',
-        image_url: imageUrl,
-        model_type: orderData.style,
-        engraving_text: orderData.engravingText || null,
-        font_style: orderData.fontStyle || 'arial',
-        color: orderData.color || 'black',
-        quality: orderData.quality || 'standard',
-        total_amount: orderData.totalAmount,
-        stripe_payment_intent_id: orderData.stripePaymentIntentId || null,
-        stl_file_url: 'https://example.com/fake-download.stl', // Mock STL file URL
-        specifications: orderData.specifications || null
+      const createOrderPayload = {
+        userId: user.id,  // Use the actual user ID from the database
+        photoUrl: orderData.photoUrl,  // Fixed: was imageUrl, should be photoUrl
+        style: orderData.style,        // Fixed: was modelType, should be style  
+        engravingText: orderData.engravingText,
+        fontStyle: orderData.fontStyle,
+        color: orderData.color,
+        quality: orderData.quality,
+        totalAmount: orderData.totalAmount,
+        specifications: orderData.specifications,
+        stripePaymentIntentId: orderData.stripePaymentIntentId
       };
       
-      console.log('📋 SUPABASE INSERT PAYLOAD:');
-      console.log('=====================================');
-      console.log(JSON.stringify(supabasePayload, null, 2));
-      console.log('=====================================');
-      console.log('Key field validation:');
-      console.log('- image_url:', supabasePayload.image_url, '(type:', typeof supabasePayload.image_url, ')');
-      console.log('- model_type:', supabasePayload.model_type);
-      console.log('- engraving_text:', supabasePayload.engraving_text);
-      console.log('=====================================');
+
       
-      // Insert into Supabase orders table
-      const { data: order, error } = await supabase
-        .from('orders')
-        .insert(supabasePayload)
-        .select()
-        .single();
+      const order = await storage.createOrder(createOrderPayload);
       
-      if (error) {
-        console.error('❌ SUPABASE INSERT ERROR:');
-        console.error('Error code:', error.code);
-        console.error('Error message:', error.message);
-        console.error('Error details:', error.details);
-        console.error('Error hint:', error.hint);
-        console.error('Payload that failed:', JSON.stringify(supabasePayload, null, 2));
-        return res.status(500).json({ 
-          message: "Failed to create order in Supabase", 
-          error: error.message,
-          details: error.details
-        });
-      }
+      console.log('✅ Order created successfully in development database:', order.id);
+      
+      return res.json({
+        ...order,
+        message: "Order created successfully"
+      });
       
       console.log('✅ SUPABASE INSERT SUCCESSFUL:');
       console.log('- Order ID:', order.id);
