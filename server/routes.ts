@@ -430,9 +430,8 @@ export async function registerRoutes(app: Express): Promise<void> {
       
       // Update order with payment intent ID if orderId provided
       if (orderId) {
-        const { updateOrderInSupabase } = await import('./supabase-helper');
-        await updateOrderInSupabase(orderId, {
-          stripe_payment_intent_id: paymentIntent.id,
+        await storage.updateOrder(orderId, {
+          stripePaymentIntentId: paymentIntent.id,
         });
       }
       
@@ -451,9 +450,8 @@ export async function registerRoutes(app: Express): Promise<void> {
         return res.status(400).json({ message: "Order ID is required" });
       }
 
-      // Get order details from Supabase
-      const { getOrderFromSupabase } = await import('./supabase-helper');
-      const order = await getOrderFromSupabase(orderId);
+      // Get order details from development database (consistent with order creation)
+      const order = await storage.getOrder(orderId);
       if (!order) {
         return res.status(404).json({ message: "Order not found" });
       }
@@ -475,11 +473,11 @@ export async function registerRoutes(app: Express): Promise<void> {
             price_data: {
               currency: 'usd',
               product_data: {
-                name: `Custom 3D ${order.model_type.charAt(0).toUpperCase() + order.model_type.slice(1)}`,
-                description: order.engraving_text ? `Engraved: "${order.engraving_text}"` : 'Custom 3D printed model',
-                // Remove images array since order.image_url may not be a valid public URL for Stripe
+                name: `Custom 3D ${order.style.charAt(0).toUpperCase() + order.style.slice(1)}`,
+                description: order.engravingText ? `Engraved: "${order.engravingText}"` : 'Custom 3D printed model',
+                // Remove images array since order.photoUrl may not be a valid public URL for Stripe
               },
-              unit_amount: Math.round(parseFloat(order.total_amount) * 100), // Convert to cents
+              unit_amount: Math.round(parseFloat(order.totalAmount) * 100), // Convert to cents
             },
             quantity: 1,
           },
@@ -489,9 +487,9 @@ export async function registerRoutes(app: Express): Promise<void> {
         cancel_url: cancelUrl,
         metadata: {
           orderId: orderId,
-          model_type: order.model_type,
-          engraving_text: order.engraving_text || '',
-          total_amount: order.total_amount,
+          model_type: order.style,
+          engraving_text: order.engravingText || '',
+          total_amount: order.totalAmount,
         },
       });
 
