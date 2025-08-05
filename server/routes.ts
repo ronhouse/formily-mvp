@@ -106,10 +106,10 @@ async function triggerSTLGeneration(order: any) {
     
     const webhookPayload = {
       order_id: order.id,
-      image_url: order.image_url,
-      model_type: order.model_type,
-      engraving_text: order.engraving_text,
-      font_style: order.font_style,
+      image_url: order.photoUrl,
+      model_type: order.style,
+      engraving_text: order.engravingText,
+      font_style: order.fontStyle,
       color: order.color,
       quality: order.quality,
       specifications: order.specifications
@@ -128,18 +128,17 @@ async function triggerSTLGeneration(order: any) {
     
     const mockResponse = {
       status: "ready",
-      stl_file_url: `${protocol}://${baseUrl}/api/download-stl/${order.id}-${order.model_type}-${timestamp}.stl`
+      stl_file_url: `${protocol}://${baseUrl}/api/download-stl/${order.id}-${order.style}-${timestamp}.stl`
     };
     
     console.log(`🔗 Generated STL URL: ${mockResponse.stl_file_url}`);
 
     console.log(`🎉 STL Generation Response:`, JSON.stringify(mockResponse, null, 2));
 
-    // Update order with STL generation results
-    const { updateOrderInSupabase } = await import('./supabase-helper');
-    await updateOrderInSupabase(order.id, {
+    // Update order with STL generation results (use development database)
+    await storage.updateOrder(order.id, {
       status: 'ready',
-      stl_file_url: mockResponse.stl_file_url
+      stlFileUrl: mockResponse.stl_file_url
     });
 
     console.log(`✅ Order ${order.id} updated with STL file: ${mockResponse.stl_file_url}`);
@@ -525,10 +524,9 @@ export async function registerRoutes(app: Express): Promise<void> {
         console.log(`📦 Order ID from session: ${orderId}`);
         
         if (orderId) {
-          // Update order with payment info and status
-          const { updateOrderInSupabase, getOrderFromSupabase } = await import('./supabase-helper');
-          await updateOrderInSupabase(orderId, {
-            stripe_payment_intent_id: paymentIntentId,
+          // Update order with payment info and status (use development database)
+          await storage.updateOrder(orderId, {
+            stripePaymentIntentId: paymentIntentId,
             status: 'paid',
           });
           
@@ -537,7 +535,7 @@ export async function registerRoutes(app: Express): Promise<void> {
 
           // Trigger STL generation webhook
           try {
-            const order = await getOrderFromSupabase(orderId);
+            const order = await storage.getOrder(orderId);
             if (order) {
               console.log(`🔨 Triggering STL generation for order: ${orderId}`);
               await triggerSTLGeneration(order);
