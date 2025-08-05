@@ -73,3 +73,15 @@ Example Order:
 - ✅ Email system integrated using SendGrid API (env key: `SENDGRID_API_KEY`)
 - ✅ STL cleanup endpoint created for expired/failed orders (14+ days)
 - ✅ UI polish complete (navbar links, scroll bug, preview placeholders)
+
+## [PHASE 5 – STL Pipeline Functional] – August 5th 2025
+
+### Major Updates
+- 🔧 Fixed legacy mock logic — payment endpoint now triggers real STL generation via Replicate TripoSR
+- 🧠 Confirmed `.glb → .stl` conversion pipeline seamlessly using actual TripoSR outputs
+- 🎯 End-to-end test passed with user-uploaded image (Jake) — STL file downloadable and geometry verified
+
+### Known Issues Remaining
+- Model scale too small by default
+- Unwanted background geometry
+- Low detail quality from default model output

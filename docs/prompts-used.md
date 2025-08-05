@@ -90,3 +90,17 @@ Stripe & STL Integration:
 
 ### 6. Password Gate for `/admin`
 > "Add a password gate to the admin page that prompts for a shared secret and stores it in localStorage..."
+
+### Phase 5: STL Quality Improvements
+
+#### A. Remove Legacy Mock Trigger
+> “Replace payment success logic's mock STL trigger with real STL generation function.”
+
+#### B. GLB to STL Conversion Validation
+> “Add logging and mesh-count checks during GLB → STL conversion.”
+
+#### C. Frontend Polling Fix
+> “Ensure confirmation page stops spinner when status = 'completed' and `stl_file_url` is populated.”
+
+#### D. Quality Enhancements Prompt
+> “Normalize STL scale, center mesh, add background-removal, and enforce minimum file size before saving.”

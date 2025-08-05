@@ -74,3 +74,10 @@
 ### 🚧 Still Mocked
 - STL generation uses fake data, not real AI or mesh service
 - Webhook posts to mock endpoint, not real print API
+
+### 🆕 STL Pipeline Fixes August 5th 2025
+
+- ✅ Replaced legacy `triggerSTLGeneration` mock in payment flow with actual call to Replicate-based STL service
+- ✅ Ensured `.stl` file only saved after successful `.glb` conversion and mesh validation
+- ✅ Frontend polling now awaits `status='completed'` and confirmed download URL
+- ⚠️ Scale normalization, background filtering, and quality checks pending Phase 5 polish
