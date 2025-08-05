@@ -1282,11 +1282,19 @@ export async function registerRoutes(app: Express): Promise<void> {
       // Check if file exists in uploads/stl directory
       const fs = await import('fs');
       const path = await import('path');
-      const filePath = path.join(process.cwd(), 'uploads', 'stl', filename);
+      const uploadsDir = path.join(process.cwd(), 'uploads', 'stl');
+      const filePath = path.join(uploadsDir, filename);
       console.log(`📁 [STL-DOWNLOAD] Looking for file at: ${filePath}`);
+      console.log(`🔍 [DEBUG] Download path components:`);
+      console.log(`   - filename param: "${filename}"`);
+      console.log(`   - uploadsDir: "${uploadsDir}"`);
+      console.log(`   - resolved filePath: "${filePath}"`);
       
       console.log(`🔍 [STL-DOWNLOAD] Checking file existence...`);
-      if (!fs.existsSync(filePath)) {
+      const fileExists = fs.existsSync(filePath);
+      console.log(`🔍 [DEBUG] fs.existsSync(${filePath}) = ${fileExists}`);
+      
+      if (!fileExists) {
         console.error(`❌ [STL-DOWNLOAD] STL file not found: ${filename}`);
         console.error(`❌ [STL-DOWNLOAD] File path checked: ${filePath}`);
         

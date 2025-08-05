@@ -156,6 +156,10 @@ async function saveSTLFile(stlBuffer: Buffer, filename: string): Promise<string>
 
   const filePath = path.join(uploadsDir, filename);
   console.log(`🗂️ [SAVE-STL] Full file path: ${filePath}`);
+  console.log(`🔍 [DEBUG] Path components:`);
+  console.log(`   - uploadsDir: "${uploadsDir}"`);
+  console.log(`   - filename: "${filename}"`);
+  console.log(`   - resolved path: "${filePath}"`);
   
   console.log(`💾 [SAVE-STL] Writing file to disk...`);
   await fsPromises.writeFile(filePath, stlBuffer);
@@ -297,6 +301,12 @@ export async function generateSTLWithReplicate(params: STLGenerationParams): Pro
       // Save final STL file
       const timestamp = Date.now();
       const filename = `${params.orderId}-${params.modelType}-${timestamp}.stl`;
+      console.log(`🔍 [DEBUG] Filename generation:`);
+      console.log(`   - orderId: "${params.orderId}"`);
+      console.log(`   - modelType: "${params.modelType}"`);
+      console.log(`   - timestamp: ${timestamp}`);
+      console.log(`   - final filename: "${filename}"`);
+      
       const stlFileUrl = await saveSTLFile(stlBuffer, filename);
       
       // Calculate final processing time
