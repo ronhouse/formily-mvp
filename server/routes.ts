@@ -1535,4 +1535,43 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
+  // Test endpoint for STL generation with real images
+  app.post('/api/test-stl', async (req, res) => {
+    try {
+      const { imageUrl, orderId, modelType } = req.body;
+      
+      console.log(`🧪 [TEST-STL] Testing STL generation with real image`);
+      console.log(`🧪 [TEST-STL] Image URL: ${imageUrl}`);
+      console.log(`🧪 [TEST-STL] Order ID: ${orderId}`);
+      console.log(`🧪 [TEST-STL] Model Type: ${modelType}`);
+
+      const { generateSTLWithReplicate } = await import('./replicate-stl-service');
+      const result = await generateSTLWithReplicate({
+        imageUrl: imageUrl || "https://replicate.delivery/pbxt/KVwdH39PhIC46WaizHYsrFp9f5oLSr65VKhEtxoFtmmwEqeL/hamburger.png",
+        orderId: orderId || "test-order-001",
+        modelType: modelType || "pet_sculpture"
+      });
+
+      console.log(`🧪 [TEST-STL] Generation completed successfully!`);
+      console.log(`🧪 [TEST-STL] STL File URL: ${result.stlFileUrl}`);
+      console.log(`🧪 [TEST-STL] Details:`, result.details);
+
+      res.json({
+        success: true,
+        message: "STL generation test completed successfully",
+        result: {
+          stlFileUrl: result.stlFileUrl,
+          details: result.details
+        }
+      });
+    } catch (error: any) {
+      console.error('🧪 [TEST-STL] Test failed:', error);
+      res.status(500).json({ 
+        success: false, 
+        error: error instanceof Error ? error.message : 'Unknown error',
+        message: 'STL generation test failed'
+      });
+    }
+  });
+
 }

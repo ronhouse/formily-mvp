@@ -223,7 +223,8 @@ export async function generateSTLWithReplicate(params: STLGenerationParams): Pro
     
     const output = await replicate.run(modelVersion, {
       input: {
-        image: params.imageUrl,
+        image_path: params.imageUrl,
+        do_remove_background: false
       }
     });
 
@@ -309,7 +310,7 @@ export async function generateSTLWithReplicate(params: STLGenerationParams): Pro
           generatedAt: new Date().toISOString(),
           service: 'Replicate TripoSR',
           orderId: params.orderId,
-          replicateVersion: 'camenduru/tripo-sr'
+          replicateVersion: 'camenduru/tripo-sr:e0d3fe8abce3ba86497ea3530d9eae59af7b2231b6c82bedfc32b0732d35ec3a'
         }
       }
     };
