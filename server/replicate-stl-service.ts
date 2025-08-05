@@ -1,5 +1,6 @@
 import Replicate from 'replicate';
 import fs from 'fs';
+import { promises as fsPromises } from 'fs';
 import path from 'path';
 import { createWriteStream } from 'fs';
 import { pipeline } from 'stream/promises';
@@ -115,6 +116,17 @@ function createPlaceholderSTL(): Buffer {
   return Buffer.concat([stlHeader, triangleCount, triangle1, triangle2]);
 }
 
+// Ensure directory exists
+async function ensureDirectoryExists(dirPath: string): Promise<void> {
+  try {
+    await fsPromises.mkdir(dirPath, { recursive: true });
+  } catch (error: any) {
+    if (error.code !== 'EEXIST') {
+      throw error;
+    }
+  }
+}
+
 // Download file from URL and return as Buffer
 async function downloadFile(url: string): Promise<Buffer> {
   const response = await fetch(url);
@@ -146,11 +158,11 @@ async function saveSTLFile(stlBuffer: Buffer, filename: string): Promise<string>
   console.log(`🗂️ [SAVE-STL] Full file path: ${filePath}`);
   
   console.log(`💾 [SAVE-STL] Writing file to disk...`);
-  await fs.promises.writeFile(filePath, stlBuffer);
+  await fsPromises.writeFile(filePath, stlBuffer);
   
   // Verify file was written successfully
   try {
-    const stats = await fs.promises.stat(filePath);
+    const stats = await fsPromises.stat(filePath);
     console.log(`✅ [SAVE-STL] File verification successful`);
     console.log(`📊 [SAVE-STL] File size on disk: ${stats.size} bytes`);
     console.log(`📅 [SAVE-STL] File created: ${stats.birthtime.toISOString()}`);
@@ -232,7 +244,7 @@ export async function generateSTLWithReplicate(params: STLGenerationParams): Pro
     console.log(`📦 [STL-GEN] Response type: ${typeof output}`);
     console.log(`📝 [STL-GEN] Raw response:`, JSON.stringify(output, null, 2));
 
-    // Step 3: Extract GLB URL from response
+    // Step 3: Handle GLB file from TripoSR (can be URL or ReadableStream)
     let glbUrl: string;
     if (typeof output === 'string') {
       glbUrl = output;
@@ -243,6 +255,75 @@ export async function generateSTLWithReplicate(params: STLGenerationParams): Pro
     } else if (output && typeof output === 'object' && 'glb' in output) {
       glbUrl = (output as any).glb;
       console.log(`🔗 [STL-GEN] GLB URL extracted from object.glb`);
+    } else if (output && output instanceof ReadableStream) {
+      // TripoSR returns GLB file as ReadableStream
+      console.log(`📦 [STL-GEN] Received GLB file as ReadableStream - converting to local file`);
+      
+      const reader = output.getReader();
+      const chunks = [];
+      let done = false;
+      
+      while (!done) {
+        const { value, done: streamDone } = await reader.read();
+        done = streamDone;
+        if (value) {
+          chunks.push(value);
+        }
+      }
+      
+      const glbBuffer = Buffer.concat(chunks);
+      console.log(`📊 [STL-GEN] GLB stream size: ${glbBuffer.length} bytes (${(glbBuffer.length / 1024 / 1024).toFixed(2)} MB)`);
+      
+      // Save temporary GLB file and use path for conversion
+      const tempFilename = `temp_${params.orderId}_${Date.now()}.glb`;
+      const tempDir = path.join(process.cwd(), 'uploads/temp');
+      await ensureDirectoryExists(tempDir);
+      const tempPath = path.join(tempDir, tempFilename);
+      
+      await fsPromises.writeFile(tempPath, glbBuffer);
+      console.log(`💾 [STL-GEN] GLB file saved temporarily: ${tempPath}`);
+      
+      // Skip download step since we already have the buffer
+      console.log(`🔄 [STL-GEN] Skipping download - using stream data directly for STL conversion`);
+      
+      const conversionStartTime = Date.now();
+      const stlBuffer = await convertGLBtoSTL(glbBuffer);
+      const conversionTime = Date.now() - conversionStartTime;
+      
+      console.log(`✅ [STL-GEN] STL conversion completed`);
+      console.log(`📊 [STL-GEN] STL file size: ${stlBuffer.length} bytes (${(stlBuffer.length / 1024 / 1024).toFixed(2)} MB)`);
+      console.log(`⏱️ [STL-GEN] Conversion time: ${conversionTime}ms`);
+
+      // Save final STL file
+      const timestamp = Date.now();
+      const filename = `${params.orderId}-${params.modelType}-${timestamp}.stl`;
+      const stlFileUrl = await saveSTLFile(stlBuffer, filename);
+      
+      // Calculate final processing time
+      const processingTime = Date.now() - startTime;
+      
+      return {
+        stlFileUrl,
+        details: {
+          filename,
+          fileSize: stlBuffer.length,
+          modelType: params.modelType,
+          quality: params.quality || 'standard',
+          processingTime,
+          features: {
+            hasEngraving: Boolean(params.engravingText),
+            engravingText: params.engravingText || null,
+            fontStyle: params.fontStyle || 'arial',
+            color: params.color || 'black'
+          },
+          metadata: {
+            generatedAt: new Date().toISOString(),
+            service: 'Replicate TripoSR',
+            orderId: params.orderId,
+            replicateVersion: modelVersion
+          }
+        }
+      };
     } else {
       console.error(`❌ [STL-GEN] Unexpected Replicate output format:`, output);
       throw new Error(`Unexpected output format from Replicate: ${JSON.stringify(output)}`);

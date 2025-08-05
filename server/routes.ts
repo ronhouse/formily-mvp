@@ -1574,4 +1574,12 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
+  // Special endpoint to serve Jake's test image
+  app.get('/jake-test-image', (req, res) => {
+    const path = require('path');
+    const imagePath = path.join(__dirname, '../uploads/jake_test_image.jpg');
+    console.log(`🐕 [JAKE-IMAGE] Serving Jake's test image from: ${imagePath}`);
+    res.sendFile(imagePath);
+  });
+
 }
