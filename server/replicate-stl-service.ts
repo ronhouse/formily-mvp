@@ -4,33 +4,61 @@ import { promises as fsPromises } from 'fs';
 import path from 'path';
 import { createWriteStream } from 'fs';
 import { pipeline } from 'stream/promises';
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 
 const replicate = new Replicate({
   auth: process.env.REPLICATE_API_TOKEN,
 });
 
-// GLB to STL conversion - simplified approach for production reliability
+// GLB to STL conversion with proper Three.js parsing and mesh validation
 async function convertGLBtoSTL(glbBuffer: Buffer): Promise<Buffer> {
   try {
     console.log(`🔄 Converting GLB to STL (${glbBuffer.length} bytes)`);
     
-    // For production reliability, we'll create a valid STL that represents the 3D model
-    // In a full production setup, you would:
-    // 1. Use a dedicated GLB/GLTF parser like three.js or similar
-    // 2. Extract mesh data and convert to STL format
-    // 3. Use a service like pymeshlab, Open3D, or FBX SDK
+    // Parse GLB with Three.js GLTF Loader
+    const gltf = await parseGLBWithThreeJS(glbBuffer);
     
-    // For now, create a substantial STL file that includes metadata from the GLB
-    const timestamp = Date.now();
-    const stlContent = createDetailedSTL(glbBuffer.length, timestamp);
+    // Validate meshes
+    const meshes = extractMeshes(gltf);
+    console.log(`🔍 [MESH-VALIDATION] Found ${meshes.length} mesh(es) in GLB`);
     
-    console.log(`✅ STL conversion completed (${stlContent.length} bytes)`);
-    return stlContent;
+    if (meshes.length === 0) {
+      console.error('❌ [MESH-VALIDATION] No meshes found in GLB - cannot generate STL');
+      throw new Error('GLB contains no valid meshes for STL conversion');
+    }
+    
+    // Count total vertices across all meshes
+    let totalVertices = 0;
+    let totalTriangles = 0;
+    
+    meshes.forEach((mesh, index) => {
+      const geometry = mesh.geometry;
+      const vertexCount = geometry.attributes.position ? geometry.attributes.position.count : 0;
+      const triangleCount = geometry.index ? geometry.index.count / 3 : vertexCount / 3;
+      
+      totalVertices += vertexCount;
+      totalTriangles += triangleCount;
+      
+      console.log(`📐 [MESH-VALIDATION] Mesh ${index + 1}: ${vertexCount} vertices, ~${Math.floor(triangleCount)} triangles`);
+    });
+    
+    console.log(`📊 [MESH-VALIDATION] Total: ${totalVertices} vertices, ~${Math.floor(totalTriangles)} triangles`);
+    
+    if (totalVertices === 0) {
+      console.error('❌ [MESH-VALIDATION] All meshes have zero vertices - cannot generate STL');
+      throw new Error('GLB meshes contain no vertex data for STL conversion');
+    }
+    
+    // Convert validated meshes to STL
+    const stlBuffer = convertMeshesToBinarySTL(meshes);
+    
+    console.log(`✅ STL conversion completed (${stlBuffer.length} bytes) from ${meshes.length} mesh(es)`);
+    return stlBuffer;
     
   } catch (error) {
     console.error('❌ GLB to STL conversion failed:', error);
-    console.log('🔄 Using fallback STL generation...');
-    return createPlaceholderSTL();
+    throw error; // Re-throw to mark order as failed instead of using fallback
   }
 }
 
@@ -413,7 +441,13 @@ export async function generateSTLWithReplicate(params: STLGenerationParams): Pro
     console.error(`❌ Replicate STL generation failed:`, error);
     
     // Enhanced error handling with specific error types
-    if (error.message?.includes('authentication') || error.message?.includes('Authorization')) {
+    if (error.message?.includes('no valid meshes') || error.message?.includes('no vertex data') || error.message?.includes('GLB parsing failed')) {
+      console.error('🚫 [MESH-VALIDATION] Order will be marked as failed due to invalid mesh data');
+      throw new Error('The AI-generated 3D model contains no valid geometry data. This can happen with complex or unclear images. Please try uploading a clearer photo with better lighting and contrast.');
+    } else if (error.message?.includes('No valid triangles found')) {
+      console.error('🚫 [MESH-VALIDATION] Order will be marked as failed due to invalid triangle data');
+      throw new Error('The 3D model could not be converted to STL format due to invalid geometry. Please try again with a different image.');
+    } else if (error.message?.includes('authentication') || error.message?.includes('Authorization')) {
       throw new Error('Replicate authentication failed. Please check REPLICATE_API_TOKEN.');
     } else if (error.message?.includes('Payment Required') || error.message?.includes('Insufficient credit')) {
       throw new Error('Replicate account has insufficient credit. Please add credits at https://replicate.com/account/billing');
@@ -427,4 +461,155 @@ export async function generateSTLWithReplicate(params: STLGenerationParams): Pro
       throw new Error(`STL generation failed: ${error.message}`);
     }
   }
+}
+
+// Parse GLB buffer using Three.js GLTF Loader
+async function parseGLBWithThreeJS(glbBuffer: Buffer): Promise<any> {
+  return new Promise((resolve, reject) => {
+    const loader = new GLTFLoader();
+    
+    // Convert buffer to ArrayBuffer for Three.js
+    const arrayBuffer = glbBuffer.buffer.slice(
+      glbBuffer.byteOffset,
+      glbBuffer.byteOffset + glbBuffer.byteLength
+    );
+    
+    loader.parse(arrayBuffer, '', (gltf) => {
+      console.log('✅ [GLB-PARSE] Successfully parsed GLB with Three.js');
+      resolve(gltf);
+    }, (error) => {
+      console.error('❌ [GLB-PARSE] Failed to parse GLB:', error);
+      reject(new Error(`GLB parsing failed: ${error.message}`));
+    });
+  });
+}
+
+// Extract all meshes from parsed GLTF scene
+function extractMeshes(gltf: any): THREE.Mesh[] {
+  const meshes: THREE.Mesh[] = [];
+  
+  if (gltf.scene) {
+    gltf.scene.traverse((child: any) => {
+      if (child instanceof THREE.Mesh) {
+        meshes.push(child);
+        console.log(`🔍 [MESH-EXTRACT] Found mesh: ${child.name || 'unnamed'}`);
+      }
+    });
+  }
+  
+  return meshes;
+}
+
+// Convert Three.js meshes to binary STL format
+function convertMeshesToBinarySTL(meshes: THREE.Mesh[]): Buffer {
+  console.log(`🔧 [STL-CONVERT] Converting ${meshes.length} mesh(es) to binary STL`);
+  
+  // Collect all triangles from all meshes
+  const allTriangles: Array<{
+    normal: THREE.Vector3;
+    vertices: [THREE.Vector3, THREE.Vector3, THREE.Vector3];
+  }> = [];
+  
+  meshes.forEach((mesh, meshIndex) => {
+    const geometry = mesh.geometry;
+    
+    if (!geometry.attributes.position) {
+      console.warn(`⚠️ [STL-CONVERT] Mesh ${meshIndex + 1} has no position attribute, skipping`);
+      return;
+    }
+    
+    const positions = geometry.attributes.position.array;
+    const hasIndex = geometry.index !== null;
+    const indices = hasIndex ? geometry.index!.array : null;
+    
+    const triangleCount = hasIndex ? indices!.length / 3 : positions.length / 9;
+    console.log(`🔄 [STL-CONVERT] Processing mesh ${meshIndex + 1}: ${triangleCount} triangles`);
+    
+    for (let i = 0; i < triangleCount; i++) {
+      let i0, i1, i2;
+      
+      if (hasIndex) {
+        i0 = indices![i * 3] * 3;
+        i1 = indices![i * 3 + 1] * 3;
+        i2 = indices![i * 3 + 2] * 3;
+      } else {
+        i0 = i * 9;
+        i1 = i * 9 + 3;
+        i2 = i * 9 + 6;
+      }
+      
+      const v1 = new THREE.Vector3(positions[i0], positions[i0 + 1], positions[i0 + 2]);
+      const v2 = new THREE.Vector3(positions[i1], positions[i1 + 1], positions[i1 + 2]);
+      const v3 = new THREE.Vector3(positions[i2], positions[i2 + 1], positions[i2 + 2]);
+      
+      // Calculate normal
+      const edge1 = new THREE.Vector3().subVectors(v2, v1);
+      const edge2 = new THREE.Vector3().subVectors(v3, v1);
+      const normal = new THREE.Vector3().crossVectors(edge1, edge2).normalize();
+      
+      allTriangles.push({
+        normal,
+        vertices: [v1, v2, v3]
+      });
+    }
+  });
+  
+  console.log(`📊 [STL-CONVERT] Total triangles collected: ${allTriangles.length}`);
+  
+  if (allTriangles.length === 0) {
+    throw new Error('No valid triangles found in meshes for STL conversion');
+  }
+  
+  // Create binary STL
+  return createBinarySTL(allTriangles);
+}
+
+// Create binary STL buffer from triangle data
+function createBinarySTL(triangles: Array<{
+  normal: THREE.Vector3;
+  vertices: [THREE.Vector3, THREE.Vector3, THREE.Vector3];
+}>): Buffer {
+  console.log(`🏗️ [BINARY-STL] Creating binary STL with ${triangles.length} triangles`);
+  
+  const headerSize = 80;
+  const triangleCountSize = 4;
+  const triangleSize = 50; // 12 floats (48 bytes) + 2 attribute bytes
+  const totalSize = headerSize + triangleCountSize + (triangles.length * triangleSize);
+  
+  const buffer = Buffer.alloc(totalSize);
+  let offset = 0;
+  
+  // Write header (80 bytes)
+  const header = `Formily 3D Model - Generated ${new Date().toISOString()}`;
+  buffer.write(header, offset, Math.min(header.length, 80), 'ascii');
+  offset += headerSize;
+  
+  // Write triangle count (4 bytes, little-endian)
+  buffer.writeUInt32LE(triangles.length, offset);
+  offset += triangleCountSize;
+  
+  // Write triangles
+  triangles.forEach((triangle, index) => {
+    // Normal vector (3 floats)
+    buffer.writeFloatLE(triangle.normal.x, offset); offset += 4;
+    buffer.writeFloatLE(triangle.normal.y, offset); offset += 4;
+    buffer.writeFloatLE(triangle.normal.z, offset); offset += 4;
+    
+    // Vertices (9 floats)
+    triangle.vertices.forEach(vertex => {
+      buffer.writeFloatLE(vertex.x, offset); offset += 4;
+      buffer.writeFloatLE(vertex.y, offset); offset += 4;
+      buffer.writeFloatLE(vertex.z, offset); offset += 4;
+    });
+    
+    // Attribute byte count (2 bytes, typically 0)
+    buffer.writeUInt16LE(0, offset); offset += 2;
+    
+    if ((index + 1) % 1000 === 0) {
+      console.log(`🔄 [BINARY-STL] Processed ${index + 1}/${triangles.length} triangles`);
+    }
+  });
+  
+  console.log(`✅ [BINARY-STL] Binary STL created: ${buffer.length} bytes`);
+  return buffer;
 }

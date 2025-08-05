@@ -702,11 +702,25 @@ export async function registerRoutes(app: Express): Promise<void> {
               console.log(`✅ Real STL generation completed for order: ${orderId}`);
               console.log(`🔗 Real STL file URL: ${stlResult.stlFileUrl}`);
             }
-          } catch (error) {
+          } catch (error: any) {
             console.error(`❌ Error in real STL generation:`, error);
-            // Update order status to failed if STL generation fails
+            
+            // Enhanced error handling for mesh validation failures
+            if (error.message?.includes('no valid geometry data') || 
+                error.message?.includes('no valid meshes') || 
+                error.message?.includes('invalid geometry')) {
+              console.error(`🚫 [MESH-VALIDATION] Order ${orderId} failed due to invalid mesh data`);
+              console.error(`🔍 [MESH-VALIDATION] User-friendly error: ${error.message}`);
+            } else {
+              console.error(`⚠️ [STL-GEN] Order ${orderId} failed due to other error: ${error.message}`);
+            }
+            
+            // Update order status to failed with error details
             if (orderId) {
-              await updateOrderInSupabase(orderId, { status: 'failed' });
+              await updateOrderInSupabase(orderId, { 
+                status: 'failed',
+                error_message: error.message || 'STL generation failed'
+              });
             }
             // Don't fail the payment if STL generation fails
           }
@@ -826,13 +840,31 @@ export async function registerRoutes(app: Express): Promise<void> {
       console.error(`❌ [STL-ENDPOINT] STL generation failed for order ${req.params.orderId}`);
       console.error(`❌ [STL-ENDPOINT] Error type: ${error.constructor.name}`);
       console.error(`❌ [STL-ENDPOINT] Error message: ${error.message}`);
-      console.error(`❌ [STL-ENDPOINT] Error stack:`, error.stack);
       
-      // Update order status to failed
+      // Enhanced error handling for mesh validation failures
+      let userFriendlyMessage = "STL generation failed";
+      if (error.message?.includes('no valid geometry data') || 
+          error.message?.includes('no valid meshes') || 
+          error.message?.includes('invalid geometry')) {
+        console.error(`🚫 [MESH-VALIDATION] Order ${req.params.orderId} failed due to invalid mesh data`);
+        console.error(`🔍 [MESH-VALIDATION] User-friendly error: ${error.message}`);
+        userFriendlyMessage = error.message;
+      } else if (error.message?.includes('No valid triangles found')) {
+        console.error(`🚫 [MESH-VALIDATION] Order ${req.params.orderId} failed due to invalid triangle data`);
+        userFriendlyMessage = error.message;
+      } else {
+        console.error(`⚠️ [STL-GEN] Order ${req.params.orderId} failed due to other error: ${error.message}`);
+        console.error(`❌ [STL-ENDPOINT] Error stack:`, error.stack);
+      }
+      
+      // Update order status to failed with error details
       console.log(`📝 [STL-ENDPOINT] Updating order status to 'failed'...`);
       try {
         const { updateOrderInSupabase } = await import('./supabase-helper');
-        await updateOrderInSupabase(req.params.orderId, { status: 'failed' });
+        await updateOrderInSupabase(req.params.orderId, { 
+          status: 'failed',
+          error_message: error.message || 'STL generation failed'
+        });
         console.log(`✅ [STL-ENDPOINT] Order status updated to 'failed'`);
       } catch (updateError: any) {
         console.error(`❌ [STL-ENDPOINT] Failed to update order status to failed:`, updateError);
@@ -841,7 +873,7 @@ export async function registerRoutes(app: Express): Promise<void> {
       console.log(`📤 [STL-ENDPOINT] Sending error response to client`);
       res.status(500).json({ 
         success: false,
-        message: "STL generation failed", 
+        message: userFriendlyMessage, 
         error: error.message,
         orderId: req.params.orderId,
         timestamp: new Date().toISOString()
