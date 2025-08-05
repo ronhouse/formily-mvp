@@ -15,6 +15,8 @@ Preferred communication style: Simple, everyday language.
 
 **Complete Real Image Upload & Processing Pipeline (August 2025)**: Replaced placeholder image URLs with full real image upload functionality. Users can now upload actual photos that are saved to `/uploads/` directory and served via `/uploads/:filename` routes. Upload endpoint generates proper URLs using Replit domain environment variables. Complete end-to-end validation: real image upload → order creation with real URLs → STL generation from actual images → downloadable STL files. Successfully tested with order `a507b63c-36a5-4d3e-9373-dff145c0df72` using real uploaded image `jake_1754368083797.jpg` (3.58MB) → generated `50KB STL file`.
 
+**STL Generation Race Condition Fixed (August 2025)**: Identified and resolved critical issue where payment success flow was calling legacy mock `triggerSTLGeneration` function instead of real Replicate TripoSR service. This caused orders to be marked as "ready" with fake STL URLs but no actual files generated. Fixed by updating payment success and manual trigger endpoints to use `generateSTLWithReplicate` service directly. Verified fix with previously broken order `683e28d4-da52-4bfd-a52a-5616b2154619` - now generates real 50KB STL files successfully.
+
 ## System Architecture
 **Full-Stack Monorepo Structure**:
 - **Frontend**: React 18 + TypeScript + Vite, utilizing shadcn/ui (Radix primitives), Tailwind CSS, and Lucide icons for a responsive, mobile-first design. Wouter handles client-side routing.

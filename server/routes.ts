@@ -665,15 +665,49 @@ export async function registerRoutes(app: Express): Promise<void> {
           console.log(`✅ Payment successful for order: ${orderId}`);
           console.log(`💳 Payment Intent ID: ${paymentIntentId}`);
 
-          // Trigger STL generation webhook
+          // Trigger real STL generation using the production endpoint
           try {
             const order = await getOrderFromSupabase(orderId);
             if (order) {
-              console.log(`🔨 Triggering STL generation for order: ${orderId}`);
-              await triggerSTLGeneration(order);
+              console.log(`🔨 Triggering real STL generation for order: ${orderId}`);
+              
+              // Call the real STL generation endpoint that uses Replicate TripoSR
+              const { generateSTLWithReplicate } = await import('./replicate-stl-service');
+              
+              const generationParams = {
+                orderId: order.id,
+                imageUrl: order.image_url,
+                modelType: order.model_type,
+                engravingText: order.engraving_text,
+                fontStyle: order.font_style,
+                color: order.color,
+                quality: order.quality,
+                specifications: order.specifications
+              };
+              
+              console.log(`🚀 Real STL generation parameters:`, JSON.stringify(generationParams, null, 2));
+              
+              // Update status to processing first
+              await updateOrderInSupabase(orderId, { status: 'processing' });
+              
+              // Generate real STL file
+              const stlResult = await generateSTLWithReplicate(generationParams);
+              
+              // Update order with real STL file URL and completion status
+              await updateOrderInSupabase(orderId, {
+                status: 'completed',
+                stl_file_url: stlResult.stlFileUrl
+              });
+              
+              console.log(`✅ Real STL generation completed for order: ${orderId}`);
+              console.log(`🔗 Real STL file URL: ${stlResult.stlFileUrl}`);
             }
           } catch (error) {
-            console.error(`❌ Error triggering STL generation:`, error);
+            console.error(`❌ Error in real STL generation:`, error);
+            // Update order status to failed if STL generation fails
+            if (orderId) {
+              await updateOrderInSupabase(orderId, { status: 'failed' });
+            }
             // Don't fail the payment if STL generation fails
           }
         }
@@ -1342,12 +1376,39 @@ export async function registerRoutes(app: Express): Promise<void> {
       }
       
       console.log(`🔨 Manual STL generation trigger for order: ${orderId}`);
-      const result = await triggerSTLGeneration(order);
+      
+      // Use real STL generation service instead of mock
+      const { generateSTLWithReplicate } = await import('./replicate-stl-service');
+      const { updateOrderInSupabase } = await import('./supabase-helper');
+      
+      const generationParams = {
+        orderId: order.id,
+        imageUrl: order.image_url,
+        modelType: order.model_type,
+        engravingText: order.engraving_text,
+        fontStyle: order.font_style,
+        color: order.color,
+        quality: order.quality,
+        specifications: order.specifications
+      };
+      
+      // Update status to processing
+      await updateOrderInSupabase(orderId, { status: 'processing' });
+      
+      // Generate real STL file
+      const stlResult = await generateSTLWithReplicate(generationParams);
+      
+      // Update order with real STL file URL and completion status
+      await updateOrderInSupabase(orderId, {
+        status: 'completed',
+        stl_file_url: stlResult.stlFileUrl
+      });
       
       res.json({ 
-        message: "STL generation completed", 
+        message: "Real STL generation completed", 
         order_id: orderId,
-        result 
+        stlFileUrl: stlResult.stlFileUrl,
+        details: stlResult.details
       });
     } catch (error: any) {
       console.error("Error triggering STL generation:", error);
