@@ -7,13 +7,14 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/contexts/AuthContext";
 import { STYLE_OPTIONS } from "@/components/ui/style-selector";
-import { CheckCircle, Download, ExternalLink, ArrowLeft } from "lucide-react";
+import { CheckCircle, Download, ExternalLink, ArrowLeft, AlertTriangle, RefreshCw } from "lucide-react";
 
 export default function Confirmation() {
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const { user: authUser } = useAuth();
   const [paymentProcessed, setPaymentProcessed] = useState(false);
+  const [pollingStartTime, setPollingStartTime] = useState<Date | null>(null);
   const queryClient = useQueryClient();
 
   // Get session ID from URL parameters
@@ -55,8 +56,15 @@ export default function Confirmation() {
     }
   }, [sessionId, paymentProcessed]);
 
-  // Fetch order details after payment processing
-  const { data: order, isLoading } = useQuery({
+  // Set polling start time when payment is processed
+  useEffect(() => {
+    if (paymentProcessed && !pollingStartTime) {
+      setPollingStartTime(new Date());
+    }
+  }, [paymentProcessed, pollingStartTime]);
+
+  // Fetch order details after payment processing with improved polling logic
+  const { data: order, isLoading, isError } = useQuery({
     queryKey: ['/api/orders', processPaymentMutation.data?.orderId],
     queryFn: async () => {
       if (!processPaymentMutation.data?.orderId) return null;
@@ -65,8 +73,27 @@ export default function Confirmation() {
     },
     enabled: !!processPaymentMutation.data?.orderId,
     refetchInterval: (data) => {
-      // Poll every 2 seconds until STL is ready
-      return data?.status === 'ready' ? false : 2000;
+      // Stop polling if STL is completed with file URL
+      if (data?.status === 'completed' && data?.stl_file_url) {
+        return false;
+      }
+      
+      // Stop polling if generation failed
+      if (data?.status === 'failed') {
+        return false;
+      }
+      
+      // Check for 5-minute timeout
+      if (pollingStartTime) {
+        const timeElapsed = (new Date().getTime() - pollingStartTime.getTime()) / (1000 * 60);
+        if (timeElapsed >= 5) {
+          console.warn('⏰ STL generation timeout: 5 minutes elapsed');
+          return false;
+        }
+      }
+      
+      // Continue polling every 3 seconds for pending/processing orders
+      return 3000;
     },
   });
 
@@ -186,7 +213,12 @@ export default function Confirmation() {
   }
 
   const selectedStyle = STYLE_OPTIONS.find(s => s.id === order?.model_type);
-  const isSTLReady = order?.status === 'ready' && order?.stl_file_url;
+  const isSTLReady = order?.status === 'completed' && order?.stl_file_url;
+  const isGenerationFailed = order?.status === 'failed';
+  const isTimeout = pollingStartTime && 
+    (new Date().getTime() - pollingStartTime.getTime()) / (1000 * 60) >= 5 && 
+    !isSTLReady && 
+    !isGenerationFailed;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -260,7 +292,10 @@ export default function Confirmation() {
               <CardContent className="p-6">
                 <div className="text-center">
                   <h3 className="font-semibold text-gray-900 mb-4">
-                    {isSTLReady ? "Your 3D Model is Ready!" : "Generating Your 3D Model..."}
+                    {isSTLReady ? "Your 3D Model is Ready!" : 
+                     isGenerationFailed ? "Generation Failed" :
+                     isTimeout ? "Generation Timeout" :
+                     "Generating Your 3D Model..."}
                   </h3>
                   
                   {isSTLReady ? (
@@ -303,18 +338,131 @@ export default function Confirmation() {
                         {order?.engraving_text && <p>• Engraving: "{order.engraving_text}"</p>}
                       </div>
                     </div>
+                  ) : isGenerationFailed ? (
+                    <div>
+                      <div className="flex justify-center mb-4">
+                        <div className="bg-red-100 rounded-full p-3">
+                          <AlertTriangle className="w-6 h-6 text-red-600" />
+                        </div>
+                      </div>
+                      <p className="text-red-600 font-medium mb-2">STL Generation Failed</p>
+                      <p className="text-gray-600 mb-6">
+                        There was an issue generating your 3D model. Please try again.
+                      </p>
+                      
+                      <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                        <Button 
+                          onClick={handleGenerateSTL}
+                          disabled={generateSTLMutation.isPending}
+                          size="lg"
+                          className="bg-primary hover:bg-primary/90"
+                        >
+                          {generateSTLMutation.isPending ? (
+                            <>
+                              <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>
+                              Generating...
+                            </>
+                          ) : (
+                            <>
+                              <RefreshCw className="w-5 h-5 mr-2" />
+                              Retry Generation
+                            </>
+                          )}
+                        </Button>
+                        
+                        <Button 
+                          variant="outline" 
+                          size="lg"
+                          onClick={() => setLocation('/orders')}
+                        >
+                          View Order History
+                        </Button>
+                      </div>
+                    </div>
+                  ) : isTimeout ? (
+                    <div>
+                      <div className="flex justify-center mb-4">
+                        <div className="bg-orange-100 rounded-full p-3">
+                          <AlertTriangle className="w-6 h-6 text-orange-600" />
+                        </div>
+                      </div>
+                      <p className="text-orange-600 font-medium mb-2">Generation Timeout</p>
+                      <p className="text-gray-600 mb-6">
+                        STL generation is taking longer than expected. You can try again or check back later.
+                      </p>
+                      
+                      <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                        <Button 
+                          onClick={handleGenerateSTL}
+                          disabled={generateSTLMutation.isPending}
+                          size="lg"
+                          className="bg-primary hover:bg-primary/90"
+                        >
+                          {generateSTLMutation.isPending ? (
+                            <>
+                              <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>
+                              Generating...
+                            </>
+                          ) : (
+                            <>
+                              <RefreshCw className="w-5 h-5 mr-2" />
+                              Try Again
+                            </>
+                          )}
+                        </Button>
+                        
+                        <Button 
+                          variant="outline" 
+                          size="lg"
+                          onClick={() => setLocation('/orders')}
+                        >
+                          Check Later
+                        </Button>
+                      </div>
+                    </div>
                   ) : (
                     <div>
                       <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
                       <p className="text-gray-600 mb-4">
                         {order?.status === 'paid' ? 
                           'Payment confirmed! Now generating your custom 3D model...' :
+                          order?.status === 'processing' ? 
+                          'Processing your photo with AI to create your 3D model...' :
                           'We\'re processing your photo and creating your custom 3D model...'
                         }
                       </p>
                       
-                      {/* Manual STL Generation Button */}
-                      {order?.status === 'paid' && (
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                        <p className="text-sm text-blue-800 font-medium mb-2">Processing Status:</p>
+                        <div className="flex items-center space-x-2">
+                          <div className={`w-2 h-2 rounded-full ${
+                            order?.status === 'paid' || order?.status === 'processing' || order?.status === 'completed' ? 'bg-green-500' : 'bg-gray-400'
+                          }`}></div>
+                          <span className="text-sm text-blue-700">Payment Confirmed</span>
+                        </div>
+                        <div className="flex items-center space-x-2 mt-1">
+                          <div className={`w-2 h-2 rounded-full ${
+                            order?.status === 'completed' ? 'bg-green-500' : 
+                            order?.status === 'processing' ? 'bg-yellow-500 animate-pulse' : 
+                            order?.status === 'paid' ? 'bg-yellow-500 animate-pulse' : 'bg-gray-400'
+                          }`}></div>
+                          <span className="text-sm text-blue-700">3D Model Generation</span>
+                        </div>
+                      </div>
+                      
+                      {pollingStartTime && (
+                        <p className="text-sm text-gray-500 mb-4">
+                          Processing time: {Math.floor((new Date().getTime() - pollingStartTime.getTime()) / 1000 / 60)} min {Math.floor(((new Date().getTime() - pollingStartTime.getTime()) / 1000) % 60)} sec
+                        </p>
+                      )}
+                      
+                      <p className="text-sm text-gray-500">
+                        This usually takes 2-5 minutes. The page will update automatically when ready.
+                      </p>
+                      
+                      {/* Manual STL Generation Button - only show after 2 minutes */}
+                      {pollingStartTime && 
+                       (new Date().getTime() - pollingStartTime.getTime()) / (1000 * 60) >= 2 && (
                         <div className="mt-4">
                           <Button 
                             onClick={handleGenerateSTL}
@@ -328,33 +476,17 @@ export default function Confirmation() {
                                 Generating...
                               </>
                             ) : (
-                              'Retry STL Generation'
+                              <>
+                                <RefreshCw className="w-4 h-4 mr-2" />
+                                Retry Generation
+                              </>
                             )}
                           </Button>
                           <p className="text-xs text-gray-500 mt-2">
-                            If generation seems stuck, try clicking the button above
+                            Generation taking longer than expected? Try clicking above.
                           </p>
                         </div>
                       )}
-                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                        <p className="text-sm text-blue-800 font-medium mb-2">Processing Status:</p>
-                        <div className="flex items-center space-x-2">
-                          <div className={`w-2 h-2 rounded-full ${
-                            order?.status === 'paid' ? 'bg-green-500' : 'bg-gray-400'
-                          }`}></div>
-                          <span className="text-sm text-blue-700">Payment Confirmed</span>
-                        </div>
-                        <div className="flex items-center space-x-2 mt-1">
-                          <div className={`w-2 h-2 rounded-full ${
-                            order?.status === 'ready' ? 'bg-green-500' : 
-                            order?.status === 'paid' ? 'bg-yellow-500 animate-pulse' : 'bg-gray-400'
-                          }`}></div>
-                          <span className="text-sm text-blue-700">STL Generation</span>
-                        </div>
-                      </div>
-                      <p className="text-sm text-gray-500">
-                        This usually takes 2-5 minutes. The page will update automatically when ready.
-                      </p>
                     </div>
                   )}
                 </div>
