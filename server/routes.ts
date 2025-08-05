@@ -389,7 +389,7 @@ export async function registerRoutes(app: Express): Promise<void> {
         quality: orderData.quality || 'standard',
         total_amount: orderData.totalAmount,
         stripe_payment_intent_id: orderData.stripePaymentIntentId || null,
-        stl_file_url: 'https://example.com/fake-download.stl', // Mock STL file URL
+        stl_file_url: null, // STL file will be generated later
         specifications: orderData.specifications || null
       };
       
