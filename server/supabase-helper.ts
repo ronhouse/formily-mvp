@@ -55,112 +55,19 @@ export async function updateOrderInSupabase(orderId: string, updates: any) {
   return data;
 }
 
-// Helper to get user by anonymous ID from Supabase with fallback support
-export async function getUserFromSupabase(anonymousId: string) {
-  const supabase = getSupabaseClient();
-  
-  try {
-    const { data, error } = await supabase
-      .from('users')
-      .select('*')
-      .eq('anonymous_id', anonymousId)
-      .single();
-      
-    if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
-      // Check if the table doesn't exist
-      if (error.code === '42P01' || error.message.includes('does not exist')) {
-        console.log('📝 Users table does not exist in Supabase, this indicates schema needs setup');
-        throw new Error(`Schema setup required: ${error.message}`);
-      }
-      console.error('❌ Supabase user fetch error:', error);
-      throw new Error(`Failed to fetch user: ${error.message}`);
-    }
-    
-    return data;
-  } catch (error: any) {
-    console.error('❌ Error in getUserFromSupabase:', error.message);
-    throw error;
-  }
-}
-
-// Helper to create user in Supabase  
-export async function createUserInSupabase(userData: { anonymousId: string; email: string }) {
+// Helper to get user by ID from Supabase
+export async function getUserFromSupabase(userId: string) {
   const supabase = getSupabaseClient();
   
   const { data, error } = await supabase
     .from('users')
-    .insert({
-      anonymous_id: userData.anonymousId,
-      email: userData.email
-    })
-    .select()
+    .select('*')
+    .eq('id', userId)
     .single();
     
   if (error) {
-    console.error('❌ Supabase user creation error:', error);
-    throw new Error(`Failed to create user: ${error.message}`);
-  }
-  
-  return data;
-}
-
-// Helper to create user in Supabase
-export async function createUserInSupabase(userData: { anonymousId: string; email: string }) {
-  const supabase = getSupabaseClient();
-  
-  const { data, error } = await supabase
-    .from('users')
-    .insert({
-      anonymous_id: userData.anonymousId,
-      email: userData.email
-    })
-    .select()
-    .single();
-    
-  if (error) {
-    console.error('❌ Supabase user creation error:', error);
-    throw new Error(`Failed to create user: ${error.message}`);
-  }
-  
-  return data;
-}
-
-// Helper to create order in Supabase
-export async function createOrderInSupabase(orderData: {
-  userId: string;
-  photoUrl: string;
-  style: string;
-  engravingText?: string;
-  fontStyle?: string;
-  color?: string;
-  quality?: string;
-  totalAmount: string;
-  specifications?: any;
-  stripePaymentIntentId?: string;
-}) {
-  const supabase = getSupabaseClient();
-  
-  const { data, error } = await supabase
-    .from('orders')
-    .insert({
-      user_id: orderData.userId,
-      image_url: orderData.photoUrl,
-      model_type: orderData.style,
-      engraving_text: orderData.engravingText,
-      font_style: orderData.fontStyle,
-      color: orderData.color,
-      quality: orderData.quality,
-      total_amount: orderData.totalAmount,
-      specifications: orderData.specifications,
-      stripe_payment_intent_id: orderData.stripePaymentIntentId,
-      status: 'pending'
-    })
-    .select()
-    .single();
-    
-  if (error) {
-    console.error('❌ Supabase order creation error:', error);
-    throw new Error(`Failed to create order: ${error.message}`);
+    console.error('❌ Supabase user fetch error:', error);
+    throw new Error(`Failed to fetch user: ${error.message}`);
   }
   
   return data;

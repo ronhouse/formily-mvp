@@ -68,7 +68,6 @@ export class MemStorage implements IStorage {
       stripePaymentIntentId: insertOrder.stripePaymentIntentId || null,
       stlFileUrl: insertOrder.stlFileUrl || null,
       specifications: insertOrder.specifications || null,
-      printDispatched: false,
       createdAt: new Date(),
       updatedAt: new Date(),
     };
