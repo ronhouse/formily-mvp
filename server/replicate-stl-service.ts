@@ -272,86 +272,88 @@ export async function generateSTLWithReplicate(params: STLGenerationParams): Pro
     console.log(`📷 [STL-GEN] Validating image URL: ${params.imageUrl}`);
     console.log(`🎯 [STL-GEN] Model type: ${params.modelType}`);
     
-    // Step 1: Background removal preprocessing
-    console.log(`🧼 [STL-GEN] Applying background removal preprocessing...`);
-    console.log(`📷 [STL-GEN] Original image URL: ${params.imageUrl}`);
-    
-    // Extract filename from the image URL to locate original file
-    const imageUrlParts = new URL(params.imageUrl);
-    const imagePath = imageUrlParts.pathname;
-    const encodedFilename = path.basename(imagePath);
-    const imageFilename = decodeURIComponent(encodedFilename); // Decode URL-encoded characters like %20
-    
-    console.log(`📂 [STL-GEN] Extracted filename: ${encodedFilename} -> ${imageFilename}`);
-    
-    // Build paths for original and cleaned images  
-    const cleanImagePath = path.join(process.cwd(), 'uploads/clean', `clean_${imageFilename}`);
-    let originalImagePath = null;
-    
-    // Try multiple locations and filename variants
-    const possiblePaths = [
-      path.join(process.cwd(), 'uploads/original', imageFilename),
-      path.join(process.cwd(), 'uploads', imageFilename),
-    ];
-    
-    console.log(`📂 [STL-GEN] Extracted filename: ${encodedFilename} -> ${imageFilename}`);
-    console.log(`🧹 [STL-GEN] Target clean image path: ${cleanImagePath}`);
-    
-    // Try to find the image file
-    for (const testPath of possiblePaths) {
-      console.log(`🔍 [STL-GEN] Trying path: ${testPath}`);
-      try {
-        await fsPromises.access(testPath);
-        originalImagePath = testPath;
-        console.log(`✅ [STL-GEN] Original image found: ${originalImagePath}`);
-        break;
-      } catch {
-        console.log(`⚠️ [STL-GEN] Not found at: ${testPath}`);
-      }
-    }
-    
-    if (!originalImagePath) {
-      console.error(`❌ [STL-GEN] Could not find image file with any path`);
-      throw new Error(`Image file not found: ${imageFilename}`);
-    }
-    
-    // If found in uploads/, copy to uploads/original/ for consistency
-    if (originalImagePath.includes('/uploads/') && !originalImagePath.includes('/uploads/original/')) {
-      const targetOriginalPath = path.join(process.cwd(), 'uploads/original', imageFilename);
-      try {
-        await fsPromises.copyFile(originalImagePath, targetOriginalPath);
-        originalImagePath = targetOriginalPath;
-        console.log(`📋 [STL-GEN] Copied to original directory: ${targetOriginalPath}`);
-      } catch (error) {
-        console.warn(`⚠️ [STL-GEN] Could not copy to original directory, using existing path`);
-      }
-    }
-    
-    // Run background removal using Python service
-    const { removeImageBackground } = await import('./quality-enhancement-service');
-    const backgroundRemovalResult = await removeImageBackground(originalImagePath, cleanImagePath);
+    // Step 1: Replicate Background Removal
+    console.log(`🧼 [BG-REMOVAL] Starting Replicate background removal...`);
+    console.log(`📷 [BG-REMOVAL] Original image URL: ${params.imageUrl}`);
     
     let imageUrlForTripoSR = params.imageUrl; // Default to original
     
-    if (backgroundRemovalResult.success && backgroundRemovalResult.cleanImagePath) {
-      console.log(`✅ [STL-GEN] Background removal successful`);
-      console.log(`🧹 [STL-GEN] Clean image saved to: ${backgroundRemovalResult.cleanImagePath}`);
+    try {
+      // Call Replicate background removal model
+      const bgRemovalModel = "851-labs/background-remover";
+      console.log(`🚀 [BG-REMOVAL] Calling Replicate model: ${bgRemovalModel}`);
       
-      // Generate URL for cleaned image
-      const baseUrl = process.env.REPLIT_DOMAINS || process.env.REPLIT_DEV_DOMAIN || 'localhost:5000';
-      const protocol = baseUrl.includes('localhost') ? 'http' : 'https';
-      const cleanImageFilename = path.basename(backgroundRemovalResult.cleanImagePath);
-      imageUrlForTripoSR = `${protocol}://${baseUrl}/uploads/clean/${cleanImageFilename}`;
+      const bgRemovalOutput: any = await replicate.run(bgRemovalModel, {
+        input: {
+          image: params.imageUrl
+        }
+      });
       
-      console.log(`🔗 [STL-GEN] Using cleaned image URL for TripoSR: ${imageUrlForTripoSR}`);
-    } else {
-      console.warn(`⚠️ [STL-GEN] Background removal failed, using original image: ${backgroundRemovalResult.error}`);
-      console.warn(`📷 [STL-GEN] Fallback to original URL for TripoSR: ${imageUrlForTripoSR}`);
+      console.log(`✅ [BG-REMOVAL] Replicate API response received`);
+      console.log(`📦 [BG-REMOVAL] Response type: ${typeof bgRemovalOutput}`);
+      console.log(`📝 [BG-REMOVAL] Raw response:`, bgRemovalOutput);
+      
+      // Handle the response properly - it could be a string URL or an array
+      let cleanImageUrl: string | null = null;
+      
+      if (typeof bgRemovalOutput === 'string' && bgRemovalOutput.startsWith('https://')) {
+        cleanImageUrl = bgRemovalOutput;
+      } else if (Array.isArray(bgRemovalOutput) && bgRemovalOutput.length > 0 && typeof bgRemovalOutput[0] === 'string') {
+        cleanImageUrl = bgRemovalOutput[0];
+      }
+      
+      if (cleanImageUrl) {
+        // Extract filename for clean image
+        const imageUrlParts = new URL(params.imageUrl);
+        const imagePath = imageUrlParts.pathname;
+        const encodedFilename = path.basename(imagePath);
+        const imageFilename = decodeURIComponent(encodedFilename);
+        const cleanImageFilename = `clean_${imageFilename}`;
+        const cleanImagePath = path.join(process.cwd(), 'uploads/clean', cleanImageFilename);
+        
+        console.log(`📥 [BG-REMOVAL] Downloading cleaned image from: ${cleanImageUrl}`);
+        
+        // Download the cleaned image
+        const response = await fetch(cleanImageUrl);
+        if (response.ok) {
+          const arrayBuffer = await response.arrayBuffer();
+          const buffer = Buffer.from(arrayBuffer);
+          
+          // Ensure clean directory exists
+          await fsPromises.mkdir(path.dirname(cleanImagePath), { recursive: true });
+          
+          // Save cleaned image
+          await fsPromises.writeFile(cleanImagePath, buffer);
+          
+          console.log(`💾 [BG-REMOVAL] Clean image saved to: ${cleanImagePath}`);
+          console.log(`📊 [BG-REMOVAL] Clean image size: ${buffer.length} bytes (${(buffer.length / 1024 / 1024).toFixed(2)} MB)`);
+          
+          // Validate the cleaned image
+          if (buffer.length > 1024) { // At least 1KB
+            // Generate URL for cleaned image
+            const baseUrl = process.env.REPLIT_DOMAINS || process.env.REPLIT_DEV_DOMAIN || 'localhost:5000';
+            const protocol = baseUrl.includes('localhost') ? 'http' : 'https';
+            imageUrlForTripoSR = `${protocol}://${baseUrl}/uploads/clean/${cleanImageFilename}`;
+            
+            console.log(`✅ [BG-REMOVAL] Successfully processed background removal`);
+            console.log(`🔗 [BG-REMOVAL] Using cleaned image URL for TripoSR: ${imageUrlForTripoSR}`);
+          } else {
+            console.warn(`⚠️ [BG-REMOVAL] Cleaned image too small (${buffer.length} bytes), using original`);
+          }
+        } else {
+          console.warn(`⚠️ [BG-REMOVAL] Failed to download cleaned image: ${response.status} ${response.statusText}`);
+        }
+      } else {
+        console.warn(`⚠️ [BG-REMOVAL] Invalid or empty response format: ${JSON.stringify(bgRemovalOutput)}`);
+      }
+    } catch (error: any) {
+      console.error(`❌ [BG-REMOVAL] Replicate background removal failed: ${error.message}`);
+      console.warn(`📷 [BG-REMOVAL] Fallback to original URL for TripoSR: ${imageUrlForTripoSR}`);
     }
     
     console.log(`🎯 [STL-GEN] EXACT IMAGE URL BEING SUBMITTED TO TripoSR: ${imageUrlForTripoSR}`);
     
-    // Step 3: Call Replicate TripoSR model
+    // Step 2: Call Replicate TripoSR model
     const modelVersion = "camenduru/tripo-sr:e0d3fe8abce3ba86497ea3530d9eae59af7b2231b6c82bedfc32b0732d35ec3a";
     console.log(`🚀 [STL-GEN] Calling Replicate TripoSR model: ${modelVersion}`);
     console.log(`⏱️ [STL-GEN] Request timestamp: ${new Date().toISOString()}`);

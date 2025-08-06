@@ -44,36 +44,16 @@ export interface QualityGateResult {
 }
 
 /**
- * Remove background from uploaded image before sending to TripoSR
- * Takes explicit input and output paths for better control
+ * DEPRECATED: Legacy Python-based background removal
+ * Now replaced with Replicate 851-labs/background-remover model
+ * This function is kept for compatibility but no longer used
  */
 export async function removeImageBackground(inputPath: string, outputPath: string): Promise<BackgroundRemovalResult> {
-  try {
-    console.log(`🧼 [BG-REMOVAL] Starting background removal for: ${inputPath}`);
-    console.log(`🎯 [BG-REMOVAL] Output will be saved to: ${outputPath}`);
-    
-    // Ensure output directory exists
-    const outputDir = path.dirname(outputPath);
-    await ensureDirectoryExists(outputDir);
-    
-    // Call Python background removal service
-    const result = await callPythonService('remove-bg', [inputPath, outputPath]);
-    
-    if (result.success) {
-      // Verify the cleaned file was created and has reasonable size
-      const cleanStats = await fsPromises.stat(outputPath);
-      console.log(`✅ [BG-REMOVAL] Background removed successfully`);
-      console.log(`📊 [BG-REMOVAL] Clean image size: ${cleanStats.size} bytes (${(cleanStats.size / 1024 / 1024).toFixed(2)} MB)`);
-      
-      return {
-        success: true,
-        cleanImagePath: outputPath,
-        originalImagePath: inputPath
-      };
-    } else {
-      console.error(`❌ [BG-REMOVAL] Background removal failed: ${result.error}`);
-      return {
-        success: false,
+  console.warn(`⚠️ [BG-REMOVAL] DEPRECATED: Legacy background removal called. Use Replicate model instead.`);
+  return {
+    success: false,
+    error: 'Legacy background removal deprecated. Use Replicate 851-labs/background-remover model.'
+  };
         originalImagePath: inputPath,
         error: result.error || 'Background removal failed'
       };
