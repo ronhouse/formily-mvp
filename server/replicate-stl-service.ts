@@ -296,7 +296,54 @@ export async function generateSTLWithReplicate(params: STLGenerationParams): Pro
       // Handle the response properly - it could be a string URL or an array
       let cleanImageUrl: string | null = null;
       
-      if (typeof bgRemovalOutput === 'string' && bgRemovalOutput.startsWith('https://')) {
+      // Handle ReadableStream response from rembg model
+      if (bgRemovalOutput && typeof bgRemovalOutput === 'object' && bgRemovalOutput.constructor?.name === 'ReadableStream') {
+        console.log(`📥 [BG-REMOVAL] Received ReadableStream - converting to image file`);
+        
+        // Convert ReadableStream to buffer
+        const reader = bgRemovalOutput.getReader();
+        const chunks = [];
+        
+        let done = false;
+        while (!done) {
+          const { value, done: readerDone } = await reader.read();
+          done = readerDone;
+          if (value) {
+            chunks.push(value);
+          }
+        }
+        
+        const buffer = Buffer.concat(chunks);
+        
+        if (buffer.length > 1024) { // At least 1KB
+          // Extract filename for clean image
+          const imageUrlParts = new URL(params.imageUrl);
+          const imagePath = imageUrlParts.pathname;
+          const encodedFilename = path.basename(imagePath);
+          const imageFilename = decodeURIComponent(encodedFilename);
+          const cleanImageFilename = `clean_${imageFilename}`;
+          const cleanImagePath = path.join(process.cwd(), 'uploads/clean', cleanImageFilename);
+          
+          // Ensure clean directory exists
+          await fsPromises.mkdir(path.dirname(cleanImagePath), { recursive: true });
+          
+          // Save cleaned image
+          await fsPromises.writeFile(cleanImagePath, buffer);
+          
+          console.log(`💾 [BG-REMOVAL] Clean image saved to: ${cleanImagePath}`);
+          console.log(`📊 [BG-REMOVAL] Clean image size: ${buffer.length} bytes (${(buffer.length / 1024 / 1024).toFixed(2)} MB)`);
+          
+          // Generate URL for cleaned image
+          const baseUrl = process.env.REPLIT_DOMAINS || process.env.REPLIT_DEV_DOMAIN || 'localhost:5000';
+          const protocol = baseUrl.includes('localhost') ? 'http' : 'https';
+          imageUrlForTripoSR = `${protocol}://${baseUrl}/uploads/clean/${cleanImageFilename}`;
+          
+          console.log(`✅ [BG-REMOVAL] Successfully processed background removal`);
+          console.log(`🔗 [BG-REMOVAL] Using cleaned image URL for TripoSR: ${imageUrlForTripoSR}`);
+        } else {
+          console.warn(`⚠️ [BG-REMOVAL] Cleaned image too small (${buffer.length} bytes), using original`);
+        }
+      } else if (typeof bgRemovalOutput === 'string' && bgRemovalOutput.startsWith('https://')) {
         cleanImageUrl = bgRemovalOutput;
       } else if (Array.isArray(bgRemovalOutput) && bgRemovalOutput.length > 0 && typeof bgRemovalOutput[0] === 'string') {
         cleanImageUrl = bgRemovalOutput[0];

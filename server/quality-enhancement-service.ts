@@ -55,20 +55,6 @@ export async function removeImageBackground(inputPath: string, outputPath: strin
     error: 'Legacy background removal deprecated. Use Replicate 851-labs/background-remover model.'
   };
 }
-        originalImagePath: inputPath,
-        error: result.error || 'Background removal failed'
-      };
-    }
-    
-  } catch (error: any) {
-    console.error(`❌ [BG-REMOVAL] Error in background removal:`, error);
-    return {
-      success: false,
-      originalImagePath: inputPath,
-      error: error.message
-    };
-  }
-}
 
 /**
  * Normalize mesh scale using trimesh:
