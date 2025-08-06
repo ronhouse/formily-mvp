@@ -217,37 +217,46 @@ export async function registerRoutes(app: Express): Promise<void> {
     }
   });
 
-  // Serve uploaded files
-  app.get("/uploads/:filename", async (req, res) => {
+  // Serve uploaded files and subdirectories
+  app.get("/uploads/:path(*)", async (req, res) => {
     try {
-      const { filename } = req.params;
-      console.log(`📁 [FILE-SERVE] Serving uploaded file: ${filename}`);
+      const filePath = req.params.path;
+      console.log(`📁 [FILE-SERVE] Serving file: ${filePath}`);
       
       const fs = await import('fs');
       const path = await import('path');
-      const filePath = path.join(process.cwd(), 'uploads', filename);
+      const fullPath = path.join(process.cwd(), 'uploads', filePath);
       
       // Check if file exists
-      if (!fs.existsSync(filePath)) {
-        console.error(`❌ [FILE-SERVE] File not found: ${filePath}`);
+      if (!fs.existsSync(fullPath)) {
+        console.error(`❌ [FILE-SERVE] File not found: ${fullPath}`);
         return res.status(404).json({ message: "File not found" });
       }
       
       // Get file stats and set headers
-      const stats = await fs.promises.stat(filePath);
-      const mimeType = filename.toLowerCase().endsWith('.jpg') || filename.toLowerCase().endsWith('.jpeg') ? 'image/jpeg' :
-                      filename.toLowerCase().endsWith('.png') ? 'image/png' :
-                      filename.toLowerCase().endsWith('.heic') ? 'image/heic' :
-                      'application/octet-stream';
+      const stats = await fs.promises.stat(fullPath);
+      const filename = path.basename(filePath);
+      
+      let mimeType = 'application/octet-stream';
+      if (filename.toLowerCase().endsWith('.jpg') || filename.toLowerCase().endsWith('.jpeg')) {
+        mimeType = 'image/jpeg';
+      } else if (filename.toLowerCase().endsWith('.png')) {
+        mimeType = 'image/png';
+      } else if (filename.toLowerCase().endsWith('.heic')) {
+        mimeType = 'image/heic';
+      } else if (filename.toLowerCase().endsWith('.stl')) {
+        mimeType = 'application/vnd.ms-pki.stl';
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+      }
       
       res.setHeader('Content-Type', mimeType);
       res.setHeader('Content-Length', stats.size);
       res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 24 hours
       
-      console.log(`✅ [FILE-SERVE] Serving ${filename} (${stats.size} bytes, ${mimeType})`);
+      console.log(`✅ [FILE-SERVE] Serving ${filePath} (${stats.size} bytes, ${mimeType})`);
       
       // Stream the file
-      const readStream = fs.createReadStream(filePath);
+      const readStream = fs.createReadStream(fullPath);
       readStream.pipe(res);
       
     } catch (error: any) {

@@ -245,13 +245,24 @@ export interface STLGenerationResult {
       service: string;
       orderId: string;
       replicateVersion?: string;
+      meshNormalization?: {
+        scaleFactor?: number;
+        targetSizeMm?: number;
+        vertexCount?: number;
+        faceCount?: number;
+        isWatertight?: boolean;
+      };
+      qualityGate?: {
+        passed: boolean;
+        fileSizeKB: number;
+      };
     };
   };
 }
 
 export async function generateSTLWithReplicate(params: STLGenerationParams): Promise<STLGenerationResult> {
   const startTime = Date.now();
-  console.log(`🤖 Starting real STL generation with Replicate TripoSR...`);
+  console.log(`🤖 Starting enhanced STL generation with quality improvements...`);
   console.log(`📋 Parameters:`, JSON.stringify(params, null, 2));
 
   try {
@@ -260,15 +271,44 @@ export async function generateSTLWithReplicate(params: STLGenerationParams): Pro
     console.log(`📷 [STL-GEN] Validating image URL: ${params.imageUrl}`);
     console.log(`🎯 [STL-GEN] Model type: ${params.modelType}`);
     
-    // Step 2: Call Replicate TripoSR model
+    // Step 2: Background removal preprocessing
+    console.log(`🧼 [STL-GEN] Applying background removal preprocessing...`);
+    const { removeImageBackground } = await import('./quality-enhancement-service');
+    
+    // Extract local file path from image URL
+    let localImagePath = params.imageUrl;
+    if (params.imageUrl.includes('/uploads/')) {
+      const urlPath = new URL(params.imageUrl).pathname;
+      localImagePath = path.join(process.cwd(), urlPath.substring(1)); // Remove leading slash
+    }
+    
+    console.log(`📁 [STL-GEN] Local image path: ${localImagePath}`);
+    
+    const backgroundRemovalResult = await removeImageBackground(localImagePath);
+    let imageUrlForTripoSR = params.imageUrl; // Fallback to original
+    
+    if (backgroundRemovalResult.success && backgroundRemovalResult.cleanImagePath) {
+      // Use cleaned image for TripoSR
+      const cleanRelativePath = path.relative(path.join(process.cwd(), 'uploads'), backgroundRemovalResult.cleanImagePath);
+      const replicateUrl = process.env.REPLIT_DOMAINS || process.env.REPLIT_DEV_DOMAIN;
+      const baseUrl = replicateUrl || 'localhost:5000';
+      const protocol = baseUrl.includes('localhost') ? 'http' : 'https';
+      imageUrlForTripoSR = `${protocol}://${baseUrl}/uploads/${cleanRelativePath}`;
+      
+      console.log(`✅ [STL-GEN] Using cleaned image for TripoSR: ${imageUrlForTripoSR}`);
+    } else {
+      console.log(`⚠️ [STL-GEN] Background removal failed, using original image: ${params.imageUrl}`);
+    }
+    
+    // Step 3: Call Replicate TripoSR model
     const modelVersion = "camenduru/tripo-sr:e0d3fe8abce3ba86497ea3530d9eae59af7b2231b6c82bedfc32b0732d35ec3a";
     console.log(`🚀 [STL-GEN] Calling Replicate TripoSR model: ${modelVersion}`);
     console.log(`⏱️ [STL-GEN] Request timestamp: ${new Date().toISOString()}`);
     
     const output = await replicate.run(modelVersion, {
       input: {
-        image_path: params.imageUrl,
-        do_remove_background: false
+        image_path: imageUrlForTripoSR, // Use cleaned image
+        do_remove_background: false // We already did background removal
       }
     });
 
@@ -315,27 +355,64 @@ export async function generateSTLWithReplicate(params: STLGenerationParams): Pro
       await fsPromises.writeFile(tempPath, glbBuffer);
       console.log(`💾 [STL-GEN] GLB file saved temporarily: ${tempPath}`);
       
-      // Skip download step since we already have the buffer
-      console.log(`🔄 [STL-GEN] Skipping download - using stream data directly for STL conversion`);
+      // Step 4: Enhanced GLB to STL conversion with mesh normalization
+      console.log(`🔧 [STL-GEN] Using enhanced GLB to STL conversion with trimesh normalization`);
       
       const conversionStartTime = Date.now();
-      const stlBuffer = await convertGLBtoSTL(glbBuffer);
-      const conversionTime = Date.now() - conversionStartTime;
-      
-      console.log(`✅ [STL-GEN] STL conversion completed`);
-      console.log(`📊 [STL-GEN] STL file size: ${stlBuffer.length} bytes (${(stlBuffer.length / 1024 / 1024).toFixed(2)} MB)`);
-      console.log(`⏱️ [STL-GEN] Conversion time: ${conversionTime}ms`);
-
-      // Save final STL file
       const timestamp = Date.now();
       const filename = `${params.orderId}-${params.modelType}-${timestamp}.stl`;
-      console.log(`🔍 [DEBUG] Filename generation:`);
-      console.log(`   - orderId: "${params.orderId}"`);
-      console.log(`   - modelType: "${params.modelType}"`);
-      console.log(`   - timestamp: ${timestamp}`);
-      console.log(`   - final filename: "${filename}"`);
       
-      const stlFileUrl = await saveSTLFile(stlBuffer, filename);
+      // Setup paths for normalized STL generation
+      const stlDir = path.join(process.cwd(), 'uploads/stl');
+      await ensureDirectoryExists(stlDir);
+      const finalStlPath = path.join(stlDir, filename);
+      
+      console.log(`📁 [STL-GEN] Final STL path: ${finalStlPath}`);
+      
+      // Import quality enhancement services
+      const { normalizeMeshScale, validateSTLQuality } = await import('./quality-enhancement-service');
+      
+      // Use trimesh to normalize mesh scale and export STL
+      const normalizationResult = await normalizeMeshScale(tempPath, finalStlPath, 100); // 100mm target
+      
+      if (!normalizationResult.success) {
+        console.error(`❌ [STL-GEN] Mesh normalization failed: ${normalizationResult.error}`);
+        throw new Error(`Mesh normalization failed: ${normalizationResult.error}`);
+      }
+      
+      console.log(`✅ [STL-GEN] Mesh normalization completed successfully`);
+      console.log(`📊 [STL-GEN] Scale factor: ${normalizationResult.scaleFactor}`);
+      console.log(`📏 [STL-GEN] Normalized size: ${normalizationResult.newMaxExtentMm}mm`);
+      console.log(`💧 [STL-GEN] Watertight: ${normalizationResult.isWatertight}`);
+      
+      // Step 5: Quality gate validation
+      console.log(`⚠️ [STL-GEN] Applying quality gate validation...`);
+      const qualityResult = await validateSTLQuality(finalStlPath);
+      
+      if (!qualityResult.passed) {
+        console.error(`🚫 [STL-GEN] STL file failed quality gate: ${qualityResult.reason}`);
+        console.error(`🚫 [STL-GEN] File size: ${qualityResult.fileSizeKB.toFixed(1)} KB`);
+        
+        // Delete the failed STL file
+        try {
+          await fsPromises.unlink(finalStlPath);
+          console.log(`🗑️ [STL-GEN] Deleted failed STL file: ${finalStlPath}`);
+        } catch (deleteError) {
+          console.error(`⚠️ [STL-GEN] Could not delete failed STL file:`, deleteError);
+        }
+        
+        throw new Error(qualityResult.reason || 'STL file failed quality validation');
+      }
+      
+      console.log(`✅ [STL-GEN] STL file passed quality gate (${qualityResult.fileSizeKB.toFixed(1)} KB)`);
+      
+      const conversionTime = Date.now() - conversionStartTime;
+      console.log(`⏱️ [STL-GEN] Total enhanced conversion time: ${conversionTime}ms`);
+      
+      // Generate STL file URL
+      const baseUrl = process.env.REPLIT_DOMAINS || process.env.REPLIT_DEV_DOMAIN || 'localhost:5000';
+      const protocol = baseUrl.includes('localhost') ? 'http' : 'https';
+      const stlFileUrl = `${protocol}://${baseUrl}/api/download-stl/${filename}`;
       
       // Calculate final processing time
       const processingTime = Date.now() - startTime;
@@ -344,7 +421,7 @@ export async function generateSTLWithReplicate(params: STLGenerationParams): Pro
         stlFileUrl,
         details: {
           filename,
-          fileSize: stlBuffer.length,
+          fileSize: normalizationResult.stlFileSize || 0,
           modelType: params.modelType,
           quality: params.quality || 'standard',
           processingTime,
@@ -356,9 +433,20 @@ export async function generateSTLWithReplicate(params: STLGenerationParams): Pro
           },
           metadata: {
             generatedAt: new Date().toISOString(),
-            service: 'Replicate TripoSR',
+            service: 'Enhanced TripoSR + Trimesh',
             orderId: params.orderId,
-            replicateVersion: modelVersion
+            replicateVersion: modelVersion,
+            meshNormalization: {
+              scaleFactor: normalizationResult.scaleFactor,
+              targetSizeMm: normalizationResult.targetSizeMm,
+              vertexCount: normalizationResult.vertexCount,
+              faceCount: normalizationResult.faceCount,
+              isWatertight: normalizationResult.isWatertight
+            },
+            qualityGate: {
+              passed: qualityResult.passed,
+              fileSizeKB: qualityResult.fileSizeKB
+            }
           }
         }
       };
@@ -385,37 +473,85 @@ export async function generateSTLWithReplicate(params: STLGenerationParams): Pro
     console.log(`📊 [STL-GEN] GLB file size: ${glbBuffer.length} bytes (${(glbBuffer.length / 1024 / 1024).toFixed(2)} MB)`);
     console.log(`⏱️ [STL-GEN] Download time: ${downloadTime}ms`);
 
-    // Step 5: Convert GLB to STL
-    console.log(`🔄 [STL-GEN] Starting GLB to STL conversion...`);
-    const conversionStartTime = Date.now();
+    // Save GLB file temporarily for trimesh processing
+    const tempFilename = `temp_${params.orderId}_${Date.now()}.glb`;
+    const tempDir = path.join(process.cwd(), 'uploads/temp');
+    await ensureDirectoryExists(tempDir);
+    const tempPath = path.join(tempDir, tempFilename);
     
-    const stlBuffer = await convertGLBtoSTL(glbBuffer);
-    const conversionTime = Date.now() - conversionStartTime;
-    
-    console.log(`✅ [STL-GEN] STL conversion completed`);
-    console.log(`📊 [STL-GEN] STL file size: ${stlBuffer.length} bytes (${(stlBuffer.length / 1024 / 1024).toFixed(2)} MB)`);
-    console.log(`⏱️ [STL-GEN] Conversion time: ${conversionTime}ms`);
+    await fsPromises.writeFile(tempPath, glbBuffer);
+    console.log(`💾 [STL-GEN] GLB file saved temporarily: ${tempPath}`);
 
-    // Step 6: Save STL file and get public URL
+    // Step 5: Enhanced GLB to STL conversion with mesh normalization
+    console.log(`🔧 [STL-GEN] Using enhanced GLB to STL conversion with trimesh normalization`);
+    
+    const conversionStartTime = Date.now();
     const timestamp = Date.now();
     const filename = `${params.orderId}-${params.modelType}-${timestamp}.stl`;
     
-    console.log(`💾 [STL-GEN] Preparing to save STL file`);
-    console.log(`📄 [STL-GEN] Target filename: ${filename}`);
+    // Setup paths for normalized STL generation
+    const stlDir = path.join(process.cwd(), 'uploads/stl');
+    await ensureDirectoryExists(stlDir);
+    const finalStlPath = path.join(stlDir, filename);
     
-    const stlFileUrl = await saveSTLFile(stlBuffer, filename);
+    console.log(`📁 [STL-GEN] Final STL path: ${finalStlPath}`);
+    
+    // Import quality enhancement services
+    const { normalizeMeshScale, validateSTLQuality } = await import('./quality-enhancement-service');
+    
+    // Use trimesh to normalize mesh scale and export STL
+    const normalizationResult = await normalizeMeshScale(tempPath, finalStlPath, 100); // 100mm target
+    
+    if (!normalizationResult.success) {
+      console.error(`❌ [STL-GEN] Mesh normalization failed: ${normalizationResult.error}`);
+      throw new Error(`Mesh normalization failed: ${normalizationResult.error}`);
+    }
+    
+    console.log(`✅ [STL-GEN] Mesh normalization completed successfully`);
+    console.log(`📊 [STL-GEN] Scale factor: ${normalizationResult.scaleFactor}`);
+    console.log(`📏 [STL-GEN] Normalized size: ${normalizationResult.newMaxExtentMm}mm`);
+    console.log(`💧 [STL-GEN] Watertight: ${normalizationResult.isWatertight}`);
+    
+    // Step 6: Quality gate validation
+    console.log(`⚠️ [STL-GEN] Applying quality gate validation...`);
+    const qualityResult = await validateSTLQuality(finalStlPath);
+    
+    if (!qualityResult.passed) {
+      console.error(`🚫 [STL-GEN] STL file failed quality gate: ${qualityResult.reason}`);
+      console.error(`🚫 [STL-GEN] File size: ${qualityResult.fileSizeKB.toFixed(1)} KB`);
+      
+      // Delete the failed STL file
+      try {
+        await fsPromises.unlink(finalStlPath);
+        console.log(`🗑️ [STL-GEN] Deleted failed STL file: ${finalStlPath}`);
+      } catch (deleteError) {
+        console.error(`⚠️ [STL-GEN] Could not delete failed STL file:`, deleteError);
+      }
+      
+      throw new Error(qualityResult.reason || 'STL file failed quality validation');
+    }
+    
+    console.log(`✅ [STL-GEN] STL file passed quality gate (${qualityResult.fileSizeKB.toFixed(1)} KB)`);
+    
+    const conversionTime = Date.now() - conversionStartTime;
+    console.log(`⏱️ [STL-GEN] Total enhanced conversion time: ${conversionTime}ms`);
+    
+    // Generate STL file URL
+    const baseUrl = process.env.REPLIT_DOMAINS || process.env.REPLIT_DEV_DOMAIN || 'localhost:5000';
+    const protocol = baseUrl.includes('localhost') ? 'http' : 'https';
+    const stlFileUrl = `${protocol}://${baseUrl}/api/download-stl/${filename}`;
     console.log(`✅ [STL-GEN] STL file saved successfully`);
     console.log(`🔗 [STL-GEN] STL file available at: ${stlFileUrl}`);
 
     const processingTime = Date.now() - startTime;
-    const fileSizeMB = (stlBuffer.length / (1024 * 1024)).toFixed(2);
+    // Remove this line since we're not using stlBuffer anymore - file size comes from normalizationResult
 
-    // Create detailed response
+    // Create detailed response with enhanced metadata
     const result: STLGenerationResult = {
       stlFileUrl,
       details: {
         filename,
-        fileSize: parseFloat(fileSizeMB),
+        fileSize: normalizationResult.stlFileSize || 0,
         modelType: params.modelType,
         quality: params.quality || 'standard',
         processingTime,
@@ -427,9 +563,20 @@ export async function generateSTLWithReplicate(params: STLGenerationParams): Pro
         },
         metadata: {
           generatedAt: new Date().toISOString(),
-          service: 'Replicate TripoSR',
+          service: 'Enhanced TripoSR + Trimesh',
           orderId: params.orderId,
-          replicateVersion: 'camenduru/tripo-sr:e0d3fe8abce3ba86497ea3530d9eae59af7b2231b6c82bedfc32b0732d35ec3a'
+          replicateVersion: modelVersion,
+          meshNormalization: {
+            scaleFactor: normalizationResult.scaleFactor,
+            targetSizeMm: normalizationResult.targetSizeMm,
+            vertexCount: normalizationResult.vertexCount,
+            faceCount: normalizationResult.faceCount,
+            isWatertight: normalizationResult.isWatertight
+          },
+          qualityGate: {
+            passed: qualityResult.passed,
+            fileSizeKB: qualityResult.fileSizeKB
+          }
         }
       }
     };
@@ -447,6 +594,12 @@ export async function generateSTLWithReplicate(params: STLGenerationParams): Pro
     } else if (error.message?.includes('No valid triangles found')) {
       console.error('🚫 [MESH-VALIDATION] Order will be marked as failed due to invalid triangle data');
       throw new Error('The 3D model could not be converted to STL format due to invalid geometry. Please try again with a different image.');
+    } else if (error.message?.includes('STL file too small') || error.message?.includes('quality validation')) {
+      console.error('🚫 [QUALITY-GATE] Order will be marked as failed due to quality gate failure');
+      throw new Error(error.message); // Pass through the quality gate error message
+    } else if (error.message?.includes('Mesh normalization failed')) {
+      console.error('🚫 [MESH-NORM] Order will be marked as failed due to mesh normalization failure');
+      throw new Error('The 3D model could not be properly scaled and centered. This may indicate issues with the model geometry. Please try again with a different image.');
     } else if (error.message?.includes('authentication') || error.message?.includes('Authorization')) {
       throw new Error('Replicate authentication failed. Please check REPLICATE_API_TOKEN.');
     } else if (error.message?.includes('Payment Required') || error.message?.includes('Insufficient credit')) {
