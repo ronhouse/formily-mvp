@@ -40,9 +40,22 @@ export async function getOrderFromSupabase(orderId: string) {
 export async function updateOrderInSupabase(orderId: string, updates: any) {
   const supabase = getSupabaseClient();
   
+  // Convert camelCase to snake_case for Supabase
+  const dbUpdates = { ...updates };
+  if (dbUpdates.errorMessage !== undefined) {
+    dbUpdates.error_message = dbUpdates.errorMessage;
+    delete dbUpdates.errorMessage;
+  }
+  if (dbUpdates.stlFileUrl !== undefined) {
+    dbUpdates.stl_file_url = dbUpdates.stlFileUrl;
+    delete dbUpdates.stlFileUrl;
+  }
+  
+  console.log(`📝 [SUPABASE] Updating order ${orderId} with:`, dbUpdates);
+  
   const { data, error } = await supabase
     .from('orders')
-    .update(updates)
+    .update(dbUpdates)
     .eq('id', orderId)
     .select()
     .single();

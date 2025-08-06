@@ -284,29 +284,46 @@ export async function generateSTLWithReplicate(params: STLGenerationParams): Pro
     
     console.log(`📂 [STL-GEN] Extracted filename: ${encodedFilename} -> ${imageFilename}`);
     
-    // Build paths for original and cleaned images
-    const originalImagePath = path.join(process.cwd(), 'uploads/original', imageFilename);
+    // Build paths for original and cleaned images  
     const cleanImagePath = path.join(process.cwd(), 'uploads/clean', `clean_${imageFilename}`);
+    let originalImagePath = null;
     
-    console.log(`📁 [STL-GEN] Original image path: ${originalImagePath}`);
+    // Try multiple locations and filename variants
+    const possiblePaths = [
+      path.join(process.cwd(), 'uploads/original', imageFilename),
+      path.join(process.cwd(), 'uploads', imageFilename),
+    ];
+    
+    console.log(`📂 [STL-GEN] Extracted filename: ${encodedFilename} -> ${imageFilename}`);
     console.log(`🧹 [STL-GEN] Target clean image path: ${cleanImagePath}`);
     
-    // Check if original file exists
-    try {
-      await fsPromises.access(originalImagePath);
-      console.log(`✅ [STL-GEN] Original image found: ${originalImagePath}`);
-    } catch {
-      // Fallback: use the public uploads directory
-      const fallbackOriginalPath = path.join(process.cwd(), 'uploads', imageFilename);
-      console.warn(`⚠️ [STL-GEN] Original not found in /uploads/original/, trying fallback: ${fallbackOriginalPath}`);
-      
+    // Try to find the image file
+    for (const testPath of possiblePaths) {
+      console.log(`🔍 [STL-GEN] Trying path: ${testPath}`);
       try {
-        await fsPromises.access(fallbackOriginalPath);
-        await fsPromises.copyFile(fallbackOriginalPath, originalImagePath);
-        console.log(`📋 [STL-GEN] Copied from fallback to original directory`);
+        await fsPromises.access(testPath);
+        originalImagePath = testPath;
+        console.log(`✅ [STL-GEN] Original image found: ${originalImagePath}`);
+        break;
+      } catch {
+        console.log(`⚠️ [STL-GEN] Not found at: ${testPath}`);
+      }
+    }
+    
+    if (!originalImagePath) {
+      console.error(`❌ [STL-GEN] Could not find image file with any path`);
+      throw new Error(`Image file not found: ${imageFilename}`);
+    }
+    
+    // If found in uploads/, copy to uploads/original/ for consistency
+    if (originalImagePath.includes('/uploads/') && !originalImagePath.includes('/uploads/original/')) {
+      const targetOriginalPath = path.join(process.cwd(), 'uploads/original', imageFilename);
+      try {
+        await fsPromises.copyFile(originalImagePath, targetOriginalPath);
+        originalImagePath = targetOriginalPath;
+        console.log(`📋 [STL-GEN] Copied to original directory: ${targetOriginalPath}`);
       } catch (error) {
-        console.error(`❌ [STL-GEN] Could not find image file: ${error}`);
-        throw new Error(`Image file not found: ${imageFilename}`);
+        console.warn(`⚠️ [STL-GEN] Could not copy to original directory, using existing path`);
       }
     }
     

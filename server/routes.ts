@@ -716,7 +716,7 @@ export async function registerRoutes(app: Express): Promise<void> {
               // Update order with real STL file URL and completion status
               await updateOrderInSupabase(orderId, {
                 status: 'completed',
-                stl_file_url: stlResult.stlFileUrl
+                stlFileUrl: stlResult.stlFileUrl
               });
               
               console.log(`✅ Real STL generation completed for order: ${orderId}`);
