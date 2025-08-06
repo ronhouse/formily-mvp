@@ -279,9 +279,10 @@ export async function generateSTLWithReplicate(params: STLGenerationParams): Pro
     // Extract filename from the image URL to locate original file
     const imageUrlParts = new URL(params.imageUrl);
     const imagePath = imageUrlParts.pathname;
-    const imageFilename = path.basename(imagePath);
+    const encodedFilename = path.basename(imagePath);
+    const imageFilename = decodeURIComponent(encodedFilename); // Decode URL-encoded characters like %20
     
-    console.log(`📂 [STL-GEN] Extracted filename: ${imageFilename}`);
+    console.log(`📂 [STL-GEN] Extracted filename: ${encodedFilename} -> ${imageFilename}`);
     
     // Build paths for original and cleaned images
     const originalImagePath = path.join(process.cwd(), 'uploads/original', imageFilename);

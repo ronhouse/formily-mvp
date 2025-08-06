@@ -739,7 +739,7 @@ export async function registerRoutes(app: Express): Promise<void> {
             if (orderId) {
               await updateOrderInSupabase(orderId, { 
                 status: 'failed',
-                error_message: error.message || 'STL generation failed'
+                errorMessage: error.message || 'STL generation failed'
               });
             }
             // Don't fail the payment if STL generation fails
