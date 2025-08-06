@@ -7,6 +7,11 @@ import { spawn } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
 import { promises as fsPromises } from 'fs';
+import { fileURLToPath } from 'url';
+
+// Get the directory name in ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const PYTHON_SERVICE_PATH = path.join(__dirname, 'python-quality-service.py');
 const MIN_STL_SIZE_KB = 10; // Minimum STL file size in KB

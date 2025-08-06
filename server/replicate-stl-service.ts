@@ -2,6 +2,7 @@ import Replicate from 'replicate';
 import fs from 'fs';
 import { promises as fsPromises } from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { createWriteStream } from 'fs';
 import { pipeline } from 'stream/promises';
 import * as THREE from 'three';
