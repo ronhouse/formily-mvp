@@ -287,25 +287,36 @@ export async function registerRoutes(app: Express): Promise<void> {
       const baseName = path.basename(req.file.originalname, fileExtension);
       const filename = `${timestamp}-${baseName}${fileExtension}`;
       
-      // Ensure uploads directory exists
+      // Ensure uploads directories exist
       const uploadsDir = path.join(process.cwd(), 'uploads');
+      const originalDir = path.join(process.cwd(), 'uploads/original');
+      const cleanDir = path.join(process.cwd(), 'uploads/clean');
+      
       try {
         await fsPromises.mkdir(uploadsDir, { recursive: true });
+        await fsPromises.mkdir(originalDir, { recursive: true });
+        await fsPromises.mkdir(cleanDir, { recursive: true });
       } catch (error: any) {
         if (error.code !== 'EEXIST') {
           throw error;
         }
       }
       
-      // Save file to disk
-      const filePath = path.join(uploadsDir, filename);
-      await fsPromises.writeFile(filePath, req.file.buffer);
+      // Save original file to /uploads/original/
+      const originalFilePath = path.join(originalDir, filename);
+      const publicFilePath = path.join(uploadsDir, filename); // Also save to public uploads for backward compatibility
       
-      console.log(`💾 [UPLOAD] File saved to: ${filePath}`);
+      await fsPromises.writeFile(originalFilePath, req.file.buffer);
+      await fsPromises.writeFile(publicFilePath, req.file.buffer); // Keep both for now
       
-      // Verify file was written
-      const stats = await fsPromises.stat(filePath);
-      console.log(`✅ [UPLOAD] File verification successful - Size: ${stats.size} bytes`);
+      console.log(`💾 [UPLOAD] Original file saved to: ${originalFilePath}`);
+      console.log(`💾 [UPLOAD] Public file saved to: ${publicFilePath}`);
+      
+      // Verify files were written
+      const originalStats = await fsPromises.stat(originalFilePath);
+      const publicStats = await fsPromises.stat(publicFilePath);
+      console.log(`✅ [UPLOAD] Original file verification - Size: ${originalStats.size} bytes`);
+      console.log(`✅ [UPLOAD] Public file verification - Size: ${publicStats.size} bytes`);
       
       // Construct public URL for the uploaded file
       const replicateUrl = process.env.REPLIT_DOMAINS || process.env.REPLIT_DEV_DOMAIN;

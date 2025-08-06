@@ -272,34 +272,66 @@ export async function generateSTLWithReplicate(params: STLGenerationParams): Pro
     console.log(`📷 [STL-GEN] Validating image URL: ${params.imageUrl}`);
     console.log(`🎯 [STL-GEN] Model type: ${params.modelType}`);
     
-    // Step 2: Background removal preprocessing
+    // Step 1: Background removal preprocessing
     console.log(`🧼 [STL-GEN] Applying background removal preprocessing...`);
-    const { removeImageBackground } = await import('./quality-enhancement-service');
+    console.log(`📷 [STL-GEN] Original image URL: ${params.imageUrl}`);
     
-    // Extract local file path from image URL
-    let localImagePath = params.imageUrl;
-    if (params.imageUrl.includes('/uploads/')) {
-      const urlPath = new URL(params.imageUrl).pathname;
-      localImagePath = path.join(process.cwd(), urlPath.substring(1)); // Remove leading slash
+    // Extract filename from the image URL to locate original file
+    const imageUrlParts = new URL(params.imageUrl);
+    const imagePath = imageUrlParts.pathname;
+    const imageFilename = path.basename(imagePath);
+    
+    console.log(`📂 [STL-GEN] Extracted filename: ${imageFilename}`);
+    
+    // Build paths for original and cleaned images
+    const originalImagePath = path.join(process.cwd(), 'uploads/original', imageFilename);
+    const cleanImagePath = path.join(process.cwd(), 'uploads/clean', `clean_${imageFilename}`);
+    
+    console.log(`📁 [STL-GEN] Original image path: ${originalImagePath}`);
+    console.log(`🧹 [STL-GEN] Target clean image path: ${cleanImagePath}`);
+    
+    // Check if original file exists
+    try {
+      await fsPromises.access(originalImagePath);
+      console.log(`✅ [STL-GEN] Original image found: ${originalImagePath}`);
+    } catch {
+      // Fallback: use the public uploads directory
+      const fallbackOriginalPath = path.join(process.cwd(), 'uploads', imageFilename);
+      console.warn(`⚠️ [STL-GEN] Original not found in /uploads/original/, trying fallback: ${fallbackOriginalPath}`);
+      
+      try {
+        await fsPromises.access(fallbackOriginalPath);
+        await fsPromises.copyFile(fallbackOriginalPath, originalImagePath);
+        console.log(`📋 [STL-GEN] Copied from fallback to original directory`);
+      } catch (error) {
+        console.error(`❌ [STL-GEN] Could not find image file: ${error}`);
+        throw new Error(`Image file not found: ${imageFilename}`);
+      }
     }
     
-    console.log(`📁 [STL-GEN] Local image path: ${localImagePath}`);
+    // Run background removal using Python service
+    const { removeImageBackground } = await import('./quality-enhancement-service');
+    const backgroundRemovalResult = await removeImageBackground(originalImagePath, cleanImagePath);
     
-    const backgroundRemovalResult = await removeImageBackground(localImagePath);
-    let imageUrlForTripoSR = params.imageUrl; // Fallback to original
+    let imageUrlForTripoSR = params.imageUrl; // Default to original
     
     if (backgroundRemovalResult.success && backgroundRemovalResult.cleanImagePath) {
-      // Use cleaned image for TripoSR
-      const cleanRelativePath = path.relative(path.join(process.cwd(), 'uploads'), backgroundRemovalResult.cleanImagePath);
-      const replicateUrl = process.env.REPLIT_DOMAINS || process.env.REPLIT_DEV_DOMAIN;
-      const baseUrl = replicateUrl || 'localhost:5000';
-      const protocol = baseUrl.includes('localhost') ? 'http' : 'https';
-      imageUrlForTripoSR = `${protocol}://${baseUrl}/uploads/${cleanRelativePath}`;
+      console.log(`✅ [STL-GEN] Background removal successful`);
+      console.log(`🧹 [STL-GEN] Clean image saved to: ${backgroundRemovalResult.cleanImagePath}`);
       
-      console.log(`✅ [STL-GEN] Using cleaned image for TripoSR: ${imageUrlForTripoSR}`);
+      // Generate URL for cleaned image
+      const baseUrl = process.env.REPLIT_DOMAINS || process.env.REPLIT_DEV_DOMAIN || 'localhost:5000';
+      const protocol = baseUrl.includes('localhost') ? 'http' : 'https';
+      const cleanImageFilename = path.basename(backgroundRemovalResult.cleanImagePath);
+      imageUrlForTripoSR = `${protocol}://${baseUrl}/uploads/clean/${cleanImageFilename}`;
+      
+      console.log(`🔗 [STL-GEN] Using cleaned image URL for TripoSR: ${imageUrlForTripoSR}`);
     } else {
-      console.log(`⚠️ [STL-GEN] Background removal failed, using original image: ${params.imageUrl}`);
+      console.warn(`⚠️ [STL-GEN] Background removal failed, using original image: ${backgroundRemovalResult.error}`);
+      console.warn(`📷 [STL-GEN] Fallback to original URL for TripoSR: ${imageUrlForTripoSR}`);
     }
+    
+    console.log(`🎯 [STL-GEN] EXACT IMAGE URL BEING SUBMITTED TO TripoSR: ${imageUrlForTripoSR}`);
     
     // Step 3: Call Replicate TripoSR model
     const modelVersion = "camenduru/tripo-sr:e0d3fe8abce3ba86497ea3530d9eae59af7b2231b6c82bedfc32b0732d35ec3a";

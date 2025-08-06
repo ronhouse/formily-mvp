@@ -45,45 +45,37 @@ export interface QualityGateResult {
 
 /**
  * Remove background from uploaded image before sending to TripoSR
- * Saves cleaned image to /uploads/clean/ directory
+ * Takes explicit input and output paths for better control
  */
-export async function removeImageBackground(originalImagePath: string): Promise<BackgroundRemovalResult> {
+export async function removeImageBackground(inputPath: string, outputPath: string): Promise<BackgroundRemovalResult> {
   try {
-    console.log(`🧼 [BG-REMOVAL] Starting background removal for: ${originalImagePath}`);
+    console.log(`🧼 [BG-REMOVAL] Starting background removal for: ${inputPath}`);
+    console.log(`🎯 [BG-REMOVAL] Output will be saved to: ${outputPath}`);
     
-    // Create clean directory if it doesn't exist
-    const cleanDir = path.join(process.cwd(), 'uploads', 'clean');
-    await ensureDirectoryExists(cleanDir);
-    
-    // Generate clean image path
-    const originalFilename = path.basename(originalImagePath);
-    const fileExt = path.extname(originalFilename);
-    const baseName = path.basename(originalFilename, fileExt);
-    const cleanFilename = `clean_${baseName}${fileExt}`;
-    const cleanImagePath = path.join(cleanDir, cleanFilename);
-    
-    console.log(`📁 [BG-REMOVAL] Clean image will be saved to: ${cleanImagePath}`);
+    // Ensure output directory exists
+    const outputDir = path.dirname(outputPath);
+    await ensureDirectoryExists(outputDir);
     
     // Call Python background removal service
-    const result = await callPythonService('remove-bg', [originalImagePath, cleanImagePath]);
+    const result = await callPythonService('remove-bg', [inputPath, outputPath]);
     
     if (result.success) {
       // Verify the cleaned file was created and has reasonable size
-      const cleanStats = await fsPromises.stat(cleanImagePath);
+      const cleanStats = await fsPromises.stat(outputPath);
       console.log(`✅ [BG-REMOVAL] Background removed successfully`);
       console.log(`📊 [BG-REMOVAL] Clean image size: ${cleanStats.size} bytes (${(cleanStats.size / 1024 / 1024).toFixed(2)} MB)`);
       
       return {
         success: true,
-        cleanImagePath,
-        originalImagePath
+        cleanImagePath: outputPath,
+        originalImagePath: inputPath
       };
     } else {
-      console.error(`❌ [BG-REMOVAL] Background removal failed`);
+      console.error(`❌ [BG-REMOVAL] Background removal failed: ${result.error}`);
       return {
         success: false,
-        originalImagePath,
-        error: 'Background removal failed'
+        originalImagePath: inputPath,
+        error: result.error || 'Background removal failed'
       };
     }
     
@@ -91,7 +83,7 @@ export async function removeImageBackground(originalImagePath: string): Promise<
     console.error(`❌ [BG-REMOVAL] Error in background removal:`, error);
     return {
       success: false,
-      originalImagePath,
+      originalImagePath: inputPath,
       error: error.message
     };
   }

@@ -15,11 +15,19 @@ import numpy as np
 from PIL import Image
 import trimesh
 
+# Import rembg for professional background removal
+try:
+    from rembg import remove
+    REMBG_AVAILABLE = True
+    print("🔧 [BG-REMOVAL] rembg library loaded successfully")
+except ImportError:
+    REMBG_AVAILABLE = False
+    print("⚠️ [BG-REMOVAL] rembg not available, using OpenCV fallback")
+
 
 def remove_background(input_path: str, output_path: str) -> bool:
     """
-    Remove background from image using OpenCV-based background removal
-    Fallback to simple threshold-based removal if advanced methods fail
+    Remove background from image using rembg (preferred) or OpenCV fallback
     
     Args:
         input_path: Path to input image
@@ -30,6 +38,30 @@ def remove_background(input_path: str, output_path: str) -> bool:
     """
     try:
         print(f"🧼 [BG-REMOVAL] Starting background removal for: {input_path}")
+        
+        # Try rembg first (professional AI-based background removal)
+        if REMBG_AVAILABLE:
+            print("🤖 [BG-REMOVAL] Using rembg AI-based background removal")
+            try:
+                # Read image with PIL for rembg
+                with open(input_path, 'rb') as input_file:
+                    input_data = input_file.read()
+                
+                # Remove background with rembg
+                output_data = remove(input_data)
+                
+                # Save cleaned image
+                with open(output_path, 'wb') as output_file:
+                    output_file.write(output_data)
+                
+                print(f"✅ [BG-REMOVAL] rembg background removal successful")
+                return True
+                
+            except Exception as e:
+                print(f"⚠️ [BG-REMOVAL] rembg failed: {e}, falling back to OpenCV")
+        
+        # Fallback to OpenCV-based background removal
+        print("🔧 [BG-REMOVAL] Using OpenCV-based background removal")
         
         # Read image
         image = cv2.imread(input_path)

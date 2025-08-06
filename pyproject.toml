@@ -7,5 +7,6 @@ dependencies = [
     "backgroundremover>=0.3.4",
     "opencv-python>=4.12.0.88",
     "pillow>=11.3.0",
+    "rembg>=2.0.67",
     "trimesh>=4.7.1",
 ]
