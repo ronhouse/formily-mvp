@@ -54,6 +54,7 @@ export async function removeImageBackground(inputPath: string, outputPath: strin
     success: false,
     error: 'Legacy background removal deprecated. Use Replicate 851-labs/background-remover model.'
   };
+}
         originalImagePath: inputPath,
         error: result.error || 'Background removal failed'
       };
