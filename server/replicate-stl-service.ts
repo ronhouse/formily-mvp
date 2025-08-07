@@ -7,6 +7,7 @@ import { createWriteStream } from 'fs';
 import { pipeline } from 'stream/promises';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { removeBackgroundHybrid } from './hybrid-background-removal';
 
 const replicate = new Replicate({
   auth: process.env.REPLICATE_API_TOKEN,
