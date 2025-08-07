@@ -85,3 +85,39 @@ Example Order:
 - Model scale too small by default
 - Unwanted background geometry
 - Low detail quality from default model output
+
+# 📦 Formily STL Pipeline — Phase 5 Progress Log
+
+## ✅ Major Wins
+
+- End-to-end image → 3D model STL pipeline fully operational
+- Successful image upload, order creation, Replicate API call, `.glb` to `.stl` conversion, and downloadable STL
+- First successful download rendered correctly in Bambu Studio (Jake image)
+
+## 🔄 Key Fixes During This Phase
+
+- Replaced broken TripoSR model reference with working Replicate version
+- Diagnosed and removed placeholder URLs from order creation
+- Fixed mismatch in STL filename generation vs download
+- Replaced legacy mock function that marked orders as “ready” before STL generation
+- Implemented real Replicate → `.glb` → `.stl` flow
+- Added error logging and `error_message` column to Supabase table
+- Verified successful order entries and downloads via Replit-hosted links
+
+## 🛠️ Attempted Enhancements
+
+- Installed `rembg` and created a hybrid background removal system using both Replicate and OpenCV
+- Verified directory structure: `/uploads/original/`, `/uploads/clean/`
+- Observed partial background removal success only when Jake’s image was pre-cleaned with Canva
+- Determined `rembg` failures and Replicate background removal model deprecation may be primary issues
+
+✅ Core STL generation loop validated  
+⚠️ Background removal unreliable  
+⚠️ STL detail and quality inconsistent  
+✅ Agent-powered debugging flow working  
+📌 Ready to transition to automated external pipeline (n8n)
+
+## 🧭 Next: Phase 5 (n8n-based pipeline)
+- Automate and modularize all image → background removal → 3D generation → file hosting in external workflow
+- Use n8n to debug and log each stage cleanly
+- Enable multi-model experimentation and failure fallback handling

@@ -81,3 +81,29 @@
 - ✅ Ensured `.stl` file only saved after successful `.glb` conversion and mesh validation
 - ✅ Frontend polling now awaits `status='completed'` and confirmed download URL
 - ⚠️ Scale normalization, background filtering, and quality checks pending Phase 5 polish
+
+# ⚡ Formily Wiring Status – End of Phase 4
+
+## ✅ Confirmed Working
+
+| Component                      | Status | Notes |
+|-------------------------------|--------|-------|
+| Image Upload Form             | ✅     | Saved to `/uploads/`, `/uploads/original/` |
+| Supabase Order Creation       | ✅     | Image URL saved properly |
+| Replicate API Call (TripoSR)  | ✅     | `.glb` successfully generated |
+| `.glb` to `.stl` Conversion   | ✅     | `.stl` served via Replit backend |
+| STL Download URL              | ✅     | Matches orderId-based naming convention |
+| STL Opens in Bambu Studio     | ✅     | Geometry visible |
+| Error Logging (Supabase)      | ✅     | `error_message` column added and working |
+| Background Removal Fallback   | ⚠️     | Only OpenCV works — rembg via Replicate fails silently |
+
+## ❌ Not Working or Incomplete
+
+| Component                      | Status | Fix Plan |
+|-------------------------------|--------|----------|
+| rembg (Replicate model)       | ❌     | Model may be deprecated or unreachable |
+| STL Quality Gate              | ❌     | No threshold check for low-quality files |
+| Live STL Preview (GLB)        | ❌     | Not yet implemented |
+| Mesh Optimization             | ❌     | Future polishing phase |
+| Accurate STL → DB Sync        | ⚠️     | Previously caused 404s from race conditions — fixed |
+

@@ -104,3 +104,32 @@ Stripe & STL Integration:
 
 #### D. Quality Enhancements Prompt
 > “Normalize STL scale, center mesh, add background-removal, and enforce minimum file size before saving.”
+
+# 🧠 Phase 4 – Prompts Used (Selected)
+
+## ✅ Initial Model Setup and Debugging
+- “I think we need to dive into Replicate a bit. Do we need to select a model in Replicate because I’m seeing different models with different qualities and prices?”
+- “Should the TripoSR model be andreasjansson/triposr? I can’t find that anymore.”
+- “Here’s a PDF of current image-to-3D models on Replicate.”
+
+## ✅ Debugging STL Generation Failures
+- “Still getting 404 after payment, but Replicate shows a `.glb` was created.”
+- “Let’s document what we’ve done and outline the polish steps.”
+- “STL downloaded but file contains no geometry — here’s a screenshot.”
+- “The STL works in Bambu but is small, low detail, and includes background.”
+
+## ✅ Background Removal Testing
+- “Where would the cleaned (no background) image be stored?”
+- “So rembg is failing? Only OpenCV fallback worked?”
+- “Let’s try removing the background manually with Canva.”
+- “Is 851-labs/background-remover the model we’re using?”
+- “Here’s the latest Replicate background removal model list.”
+
+## ✅ Proposal for n8n Integration
+- “Here’s what Gemini suggested for building a workflow using n8n or Opal. Would this help us?”
+- “Which one should we use? Gemini recommends n8n.”
+- “Let’s document everything, prune unneeded files, and get ready for Phase 5.”
+
+## 🆕 Key Agent Action Prompt
+> “Add a hybrid background removal pipeline using a working Replicate rembg model and OpenCV fallback. Ensure cleaned image is passed into TripoSR input and verify filename consistency with STL output.”
+
